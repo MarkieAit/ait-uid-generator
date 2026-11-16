@@ -1,4 +1,14 @@
 import streamlit as st
+# --- BEVEILIGING ---
+wachtwoord = st.text_input("Voer het DM&D wachtwoord in:", type="password")
+
+if wachtwoord != st.secrets["dmd_wachtwoord"]:
+    if wachtwoord != "":
+        st.error("Onjuist wachtwoord. Toegang geweigerd.")
+    st.stop() # Dit blokkeert het laden van de rest van de code
+# --- EINDE BEVEILIGING ---
+
+# (Hieronder staat de rest van jouw originele code)
 import json
 from pylibdmtx.pylibdmtx import encode
 from PIL import Image
