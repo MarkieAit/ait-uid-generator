@@ -31,10 +31,12 @@ st.markdown("""
     .stApp {
         background-color: #f4f5f7; 
     }
+    
     /* Maakt de zijbalk iets donkerder voor mooi contrast */
     [data-testid="stSidebar"] {
         background-color: #e2e4e8;
     }
+    
     /* Verwijder de grote lege ruimte bovenaan het scherm */
     .block-container {
         padding-top: 2rem;
@@ -42,12 +44,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-""", unsafe_allow_html=True)
-/* Verwijder de grote lege ruimte bovenaan het scherm */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 1rem;
-    }
 
 # 3. Zijbalk (Project info)
 with st.sidebar:
