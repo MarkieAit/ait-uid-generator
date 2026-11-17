@@ -1,4 +1,5 @@
 streamlit
-pillow
 pylibdmtx
-setuptools
+Pillow
+pandas
+openpyxl
