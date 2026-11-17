@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+import io
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
     st.session_state["ingelogd"] = False
