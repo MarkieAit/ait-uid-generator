@@ -1,3 +1,4 @@
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import streamlit as st
 import pandas as pd
 import io
