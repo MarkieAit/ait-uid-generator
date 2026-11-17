@@ -1,7 +1,9 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps
 import streamlit as st
 import pandas as pd
 import io
+import json
+from pylibdmtx.pylibdmtx import encode
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
@@ -17,10 +19,6 @@ if not st.session_state["ingelogd"]:
             st.error("Onjuist wachtwoord. Toegang geweigerd.")
         st.stop()
 # --- EINDE BEVEILIGING ---
-
-import json
-from pylibdmtx.pylibdmtx import encode
-from PIL import Image
 
 # 1. Pagina configuratie
 st.set_page_config(page_title="MIL-STD-130 UID Generator", layout="wide")
@@ -111,22 +109,54 @@ with col2:
                     # Vervang tekst-tags door werkelijke ASCII stuurcodes
                     barcode_data = syntax_string.replace('[RS]', chr(30)).replace('[GS]', chr(29)).replace('[EOT]', chr(4))
                     
-                    # Genereer de barcode
+                    # 1. Genereer de standaard barcode
                     encoded = encode(barcode_data.encode('utf-8'))
-                    img = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+                    img_raw = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+                    
+                    # 2. Schaal de barcode groter (NEAREST houdt de blokjes perfect scherp)
+                    schaalfactor = 4
+                    img_barcode = img_raw.resize(
+                        (img_raw.width * schaalfactor, img_raw.height * schaalfactor), 
+                        Image.Resampling.NEAREST
+                    )
+                    
+                    # 3. Inverteer naar wit-op-zwart
+                    img_barcode = ImageOps.invert(img_barcode)
+                    
+                    # 4. Maak een zwart canvas voor het complete label (breedte 750, hoogte 350)
+                    label_img = Image.new('RGB', (750, 350), color='black')
+                    
+                    # 5. Plak de barcode aan de rechterkant
+                    x_pos_barcode = 750 - img_barcode.width - 40
+                    y_pos_barcode = (350 - img_barcode.height) // 2
+                    label_img.paste(img_barcode, (x_pos_barcode, y_pos_barcode))
+                    
+                    # 6. Tekst toevoegen
+                    draw = ImageDraw.Draw(label_img)
+                    
+                    # Probeer het standaard Linux lettertype van de Streamlit Cloud te laden
+                    try:
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 38)
+                    except:
+                        font = ImageFont.load_default()
+                        
+                    # Teken de drie regels tekst (witte letters)
+                    draw.text((40, 70), f"CAGE:  {ncage_clean}", fill="white", font=font)
+                    draw.text((40, 150), f"MPN:   {mpn_clean}", fill="white", font=font)
+                    draw.text((40, 230), f"SN:    {oem_clean}", fill="white", font=font)
                     
                     # Toon in de interface
-                    st.image(img, caption="Scanbare MIL-STD-130 UID", width=250)
+                    st.image(label_img, caption="Gegenereerd Typeplaatje (Zwart/Wit)", width=500)
                     
                     # --- DOWNLOAD & PRINT KNOP ---
                     virtueel_bestand = io.BytesIO()
-                    img.save(virtueel_bestand, format="PNG")
+                    label_img.save(virtueel_bestand, format="PNG")
                     bytes_data = virtueel_bestand.getvalue()
                     
                     st.download_button(
                         label="🖨️ Download & Print Label",
                         data=bytes_data, 
-                        file_name=f"UID_{ncage_clean}_{mpn_clean}_{oem_clean}.png",
+                        file_name=f"Label_{ncage_clean}_{mpn_clean}_{oem_clean}.png",
                         mime="image/png"
                     )
                     
