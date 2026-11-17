@@ -95,8 +95,8 @@ with col2:
                     "iso_15434_syntax": syntax_string
                 }
                 
-                st.subheader("Machine-Readable JSON")
-                st.json(output_data)
+                with st.expander("Toon Machine-Readable JSON (Optioneel)"):
+    st.json(output_data)
                 
                 # Data Matrix renderen met pylibdmtx
                 st.subheader("Data Matrix (ECC 200)")
