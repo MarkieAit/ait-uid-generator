@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
     st.session_state["ingelogd"] = False
@@ -16,7 +17,6 @@ if not st.session_state["ingelogd"]:
         st.stop()
 # --- EINDE BEVEILIGING ---
 
-# (Hieronder staat de rest van jouw originele code)
 import json
 from pylibdmtx.pylibdmtx import encode
 from PIL import Image
@@ -117,7 +117,7 @@ with col2:
                     # Toon in de interface
                     st.image(img, caption="Scanbare MIL-STD-130 UID", width=250)
                     
-                    # --- NIEUW: DOWNLOAD & PRINT KNOP ---
+                    # --- DOWNLOAD & PRINT KNOP ---
                     virtueel_bestand = io.BytesIO()
                     img.save(virtueel_bestand, format="PNG")
                     bytes_data = virtueel_bestand.getvalue()
@@ -133,6 +133,63 @@ with col2:
                     st.error(f"Fout bij genereren barcode: {e}")
         else:
             st.warning("Vul alstublieft alle drie de velden in om de UID te genereren.")
+
+
+# --- NIEUW: 3. BATCH INVOER (EXCEL) ---
+st.markdown("---")
+st.header("3. Batch Invoer (Excel Upload)")
+st.write("Upload een .xlsx bestand met de kolommen: **NCAGE**, **MPN**, en **OEM** om meerdere labels tegelijk te verwerken.")
+
+excel_bestand = st.file_uploader("Kies een Excel-bestand", type=["xlsx"])
+
+if excel_bestand is not None:
+    # Lees het bestand in
+    df = pd.read_excel(excel_bestand)
+    st.write("Controleer de ingeladen data:")
+    st.dataframe(df, use_container_width=True)
+    
+    if st.button("Genereer UII's voor deze lijst", type="primary"):
+        resultaten = []
+        
+        # Loop door elke rij in de geüploade Excel
+        for index, row in df.iterrows():
+            # Haal de waarden op en converteer naar veilige string
+            ncage_clean = str(row.get('NCAGE', '')).strip().upper()
+            mpn_clean = str(row.get('MPN', '')).strip().upper()
+            oem_clean = str(row.get('OEM', '')).strip().upper()
+            
+            if ncage_clean and mpn_clean and oem_clean:
+                # Bereken UII en Syntax
+                uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
+                syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
+                
+                # Voeg toe aan de resultatenlijst
+                resultaten.append({
+                    "NCAGE": ncage_clean,
+                    "MPN": mpn_clean,
+                    "OEM": oem_clean,
+                    "Berekende UII": uii,
+                    "ISO 15434 Syntax": syntax_string
+                })
+            
+        # Maak een nieuwe tabel van de resultaten
+        df_resultaten = pd.DataFrame(resultaten)
+        
+        # Zet de tabel om naar een downloadbaar Excel-bestand in het geheugen
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_resultaten.to_excel(writer, index=False)
+        excel_data = output.getvalue()
+        
+        st.success(f"✅ {len(df_resultaten)} regels succesvol verwerkt!")
+        
+        st.download_button(
+            label="📥 Download Verwerkte Lijst (.xlsx)",
+            data=excel_data,
+            file_name="DM&D_UID_Batch_Resultaten.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+# --- EINDE BATCH INVOER ---
 
 # 5. Footer (Naam / Eigenaarschap onderaan de pagina)
 st.markdown("---")
