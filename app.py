@@ -96,7 +96,7 @@ with col2:
                 }
                 
                 with st.expander("Toon Machine-Readable JSON (Optioneel)"):
-                st.json(output_data)
+                    st.json(output_data)
                 
                 # Data Matrix renderen met pylibdmtx
                 st.subheader("Data Matrix (ECC 200)")
