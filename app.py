@@ -1,11 +1,17 @@
 import streamlit as st
 # --- BEVEILIGING ---
-wachtwoord = st.text_input("Voer het DM&D wachtwoord in:", type="password")
+if "ingelogd" not in st.session_state:
+    st.session_state["ingelogd"] = False
 
-if wachtwoord != st.secrets["dmd_wachtwoord"]:
-    if wachtwoord != "":
-        st.error("Onjuist wachtwoord. Toegang geweigerd.")
-    st.stop() # Dit blokkeert het laden van de rest van de code
+if not st.session_state["ingelogd"]:
+    wachtwoord = st.text_input("Voer het DM&D wachtwoord in:", type="password")
+    if wachtwoord == st.secrets["dmd_wachtwoord"]:
+        st.session_state["ingelogd"] = True
+        st.rerun() # Dit herlaadt de pagina direct, zonder het wachtwoordveld
+    else:
+        if wachtwoord != "":
+            st.error("Onjuist wachtwoord. Toegang geweigerd.")
+        st.stop()
 # --- EINDE BEVEILIGING ---
 
 # (Hieronder staat de rest van jouw originele code)
