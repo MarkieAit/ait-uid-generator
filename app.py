@@ -113,8 +113,10 @@ with col2:
                     encoded = encode(barcode_data.encode('utf-8'))
                     img_raw = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
                     
-                    # 2. Schaal de barcode groter (NEAREST houdt de blokjes perfect scherp)
-                    schaalfactor = 4
+                    # 2. Dynamisch schalen: de barcode mag maximaal 270x270 pixels zijn
+                    max_grootte = 270
+                    schaalfactor = max(1, min(max_grootte // img_raw.width, max_grootte // img_raw.height))
+                    
                     img_barcode = img_raw.resize(
                         (img_raw.width * schaalfactor, img_raw.height * schaalfactor), 
                         Image.Resampling.NEAREST
@@ -123,10 +125,10 @@ with col2:
                     # 3. Inverteer naar wit-op-zwart
                     img_barcode = ImageOps.invert(img_barcode)
                     
-                    # 4. Maak een zwart canvas voor het complete label (breedte 750, hoogte 350)
+                    # 4. Maak een zwart canvas (breedte 750, hoogte 350)
                     label_img = Image.new('RGB', (750, 350), color='black')
                     
-                    # 5. Plak de barcode aan de rechterkant
+                    # 5. Plak de barcode netjes gecentreerd aan de rechterkant
                     x_pos_barcode = 750 - img_barcode.width - 40
                     y_pos_barcode = (350 - img_barcode.height) // 2
                     label_img.paste(img_barcode, (x_pos_barcode, y_pos_barcode))
@@ -134,16 +136,16 @@ with col2:
                     # 6. Tekst toevoegen
                     draw = ImageDraw.Draw(label_img)
                     
-                    # Probeer het standaard Linux lettertype van de Streamlit Cloud te laden
+                    # Laad het zojuist in packages.txt geïnstalleerde lettertype
                     try:
-                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 38)
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 36)
                     except:
                         font = ImageFont.load_default()
                         
-                    # Teken de drie regels tekst (witte letters)
-                    draw.text((40, 70), f"CAGE:  {ncage_clean}", fill="white", font=font)
-                    draw.text((40, 150), f"MPN:   {mpn_clean}", fill="white", font=font)
-                    draw.text((40, 230), f"SN:    {oem_clean}", fill="white", font=font)
+                    # Teken de drie regels tekst (met iets meer marge vanaf links)
+                    draw.text((50, 80), f"CAGE:  {ncage_clean}", fill="white", font=font)
+                    draw.text((50, 160), f"MPN:   {mpn_clean}", fill="white", font=font)
+                    draw.text((50, 240), f"SN:    {oem_clean}", fill="white", font=font)
                     
                     # Toon in de interface
                     st.image(label_img, caption="Gegenereerd Typeplaatje (Zwart/Wit)", width=500)
@@ -194,42 +196,4 @@ if excel_bestand is not None:
                 uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
                 syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
                 
-                # Voeg toe aan de resultatenlijst
-                resultaten.append({
-                    "NCAGE": ncage_clean,
-                    "MPN": mpn_clean,
-                    "OEM": oem_clean,
-                    "Berekende UII": uii,
-                    "ISO 15434 Syntax": syntax_string
-                })
-            
-        # Maak een nieuwe tabel van de resultaten
-        df_resultaten = pd.DataFrame(resultaten)
-        
-        # Zet de tabel om naar een downloadbaar Excel-bestand in het geheugen
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_resultaten.to_excel(writer, index=False)
-        excel_data = output.getvalue()
-        
-        st.success(f"✅ {len(df_resultaten)} regels succesvol verwerkt!")
-        
-        st.download_button(
-            label="📥 Download Verwerkte Lijst (.xlsx)",
-            data=excel_data,
-            file_name="DM&D_UID_Batch_Resultaten.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-# --- EINDE BATCH INVOER ---
-
-# 5. Footer (Naam / Eigenaarschap onderaan de pagina)
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #555; font-size: 14px;'>
-        <strong>Ontwikkeld door: Marco van Dijk</strong><br>
-        Projectleider AIT / UID | Directie Materieel & Diensten (DM&D) / CLAS
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
+                # Voeg toe aan de resultatenlij
