@@ -111,6 +111,18 @@ with col2:
                     # Toon in de interface
                     st.image(img, caption="Scanbare MIL-STD-130 UID", width=250)
                     
+                    # --- NIEUW: DOWNLOAD & PRINT KNOP ---
+                    virtueel_bestand = io.BytesIO()
+                    img.save(virtueel_bestand, format="PNG")
+                    bytes_data = virtueel_bestand.getvalue()
+                    
+                    st.download_button(
+                        label="🖨️ Download & Print Label",
+                        data=bytes_data, 
+                        file_name=f"UID_{ncage_clean}_{mpn_clean}_{oem_clean}.png",
+                        mime="image/png"
+                    )
+                    
                 except Exception as e:
                     st.error(f"Fout bij genereren barcode: {e}")
         else:
