@@ -38,6 +38,11 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+/* Verwijder de grote lege ruimte bovenaan het scherm */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 1rem;
+    }
 
 # 3. Zijbalk (Project info)
 with st.sidebar:
