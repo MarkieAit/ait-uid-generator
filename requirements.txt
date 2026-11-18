@@ -3,3 +3,4 @@ pylibdmtx
 Pillow
 pandas
 openpyxl
+setuptools==69.5.1
