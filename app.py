@@ -265,9 +265,6 @@ with tab2:
         df = pd.read_excel(excel_bestand)
         df.columns = df.columns.str.strip().str.upper()
         
-        st.write("Voorbeeld van de ingeladen data:")
-        st.dataframe(df, use_container_width=True)
-        
         if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
             resultaten = []
             
@@ -284,13 +281,16 @@ with tab2:
                         "NCAGE": ncage_clean,
                         "MPN": mpn_clean,
                         "OEM": oem_clean,
-                        "Berekende UII": uii,
+                        "UII": uii,
                         "ISO 15434 Syntax": syntax_string
                     })
             
             df_resultaten = pd.DataFrame(resultaten)
             
             if not df_resultaten.empty:
+                st.write("Verwerkte data (inclusief berekende UII):")
+                st.dataframe(df_resultaten, use_container_width=True)
+
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df_resultaten.to_excel(writer, index=False)
@@ -307,7 +307,6 @@ with tab2:
                 )
         else:
             st.error("❌ Fout: De geüploade Excel mist één of meerdere verplichte kolommen (NCAGE, MPN of OEM). Gebruik het sjabloon rechtsboven.")
-
 # 5. Footer (Naam / Eigenaarschap onderaan de pagina)
 st.markdown("---")
 st.markdown(
