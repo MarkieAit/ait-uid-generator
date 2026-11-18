@@ -152,12 +152,11 @@ def wis_velden():
     st.session_state["ncage_input"] = ""
     st.session_state["mpn_input"] = ""
     st.session_state["oem_input"] = ""
-    st.session_state["nsn_input"] = ""
 
 def bevat_ongeldige_tekens(tekst):
     return bool(re.search(r'[^A-Za-z0-9\-/]', tekst))
 
-def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, stijl="Laser (Wit op Zwart)", nsn_clean="", construct="Construct 2"):
+def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, stijl="Laser (Wit op Zwart)", construct="Construct 2"):
     """Genereert het label (PNG Image) én voert direct een decode self-check uit."""
     barcode_data = syntax_string.replace('[RS]', chr(30)).replace('[GS]', chr(29)).replace('[EOT]', chr(4))
     
@@ -205,17 +204,14 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
     if construct == "Construct 2" and mpn_clean:
         regels.append(f"MPN:   {mpn_clean}")
     regels.append(f"SN:    {oem_clean}")
-    if nsn_clean:
-        regels.append(f"NSN:   {nsn_clean}")
 
-    font_size = 32 if len(regels) == 4 else 36
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", font_size)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 36)
     except Exception:
         font = ImageFont.load_default()
 
-    start_y = 55 if len(regels) == 4 else 75
-    stap_y = 65 if len(regels) == 4 else 80
+    start_y = 75 if len(regels) == 3 else 110
+    stap_y = 80
     for idx, regel in enumerate(regels):
         draw.text((45, start_y + idx * stap_y), regel, fill=tekstkleur, font=font)
 
@@ -228,7 +224,7 @@ with st.sidebar:
     st.info("📌 **Defensie-richtlijn:** Voor regulier Defensie-materieel is **Construct 2** (`NCAGE + MPN + SN`) verplicht.")
     st.markdown("---")
     st.caption("**Ministerie van Defensie**")
-    st.caption("Versie: v2.1 (MIL-STD-130N)")
+    st.caption("Versie: v2.2 (MIL-STD-130N)")
     st.caption("Beheer: DM&D / CLAS")
 
 # 4. Strakke donkere Header Banner
@@ -262,7 +258,6 @@ with tab1:
             with opt_col2:
                 label_stijl = st.radio("Label Uitvoering", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"], horizontal=True)
 
-            # Expliciete melding bij keuze voor Construct 1
             if construct_keuze == "Construct 1":
                 st.warning(
                     "⚠️ **Let op:** Binnen Defensie (materieelketen) is **Construct 2 verplicht**. "
@@ -279,7 +274,6 @@ with tab1:
                 mpn = ""
                 
             oem = st.text_input("OEM Serienummer (max. 30 karakters, bijv. 05677484)", max_chars=30, key="oem_input")
-            nsn = st.text_input("NSN (optioneel, 13 cijfers voor HRI, bijv. 1234-56-789-0123)", max_chars=16, key="nsn_input")
 
             # Live 50-karakter UII teller
             huidige_uii_lengte = 1 + len(ncage.strip()) + (len(mpn.strip()) if construct_keuze == "Construct 2" else 0) + len(oem.strip())
@@ -298,11 +292,6 @@ with tab1:
                 invoer_fout = True
             if oem and bevat_ongeldige_tekens(oem):
                 st.warning("⚠️ Serienummer bevat spaties of ongeldige tekens.")
-                invoer_fout = True
-            
-            nsn_digits = re.sub(r'\D', '', nsn) if nsn else ""
-            if nsn and len(nsn_digits) != 13:
-                st.warning("⚠️ Een geldig NSN bestaat uit exact 13 cijfers (streepjes toegestaan).")
                 invoer_fout = True
 
             btn_col1, btn_col2 = st.columns([2, 1])
@@ -328,7 +317,6 @@ with tab1:
                         ncage_clean = ncage.upper()
                         mpn_clean = mpn.upper()
                         oem_clean = oem.upper()
-                        nsn_clean = nsn.strip().upper()
 
                         if construct_keuze == "Construct 2":
                             uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
@@ -340,7 +328,7 @@ with tab1:
                         try:
                             label_img, decode_ok = genereer_label_afbeelding(
                                 ncage_clean, mpn_clean, oem_clean, syntax_string,
-                                stijl=label_stijl, nsn_clean=nsn_clean, construct=construct_keuze
+                                stijl=label_stijl, construct=construct_keuze
                             )
 
                             decode_badge = (
@@ -370,7 +358,6 @@ with tab1:
                                 "ncage": ncage_clean,
                                 "mpn": mpn_clean if construct_keuze == "Construct 2" else None,
                                 "oem_serial": oem_clean,
-                                "nsn_hri": nsn_clean if nsn_clean else None,
                                 "iso_15434_syntax": syntax_string,
                                 "decode_verified": decode_ok
                             }
@@ -421,8 +408,7 @@ with tab2:
         sjabloon_df = pd.DataFrame({
             "NCAGE": ["A213N"],
             "MPN": ["YS2R8X800"],
-            "OEM": ["05677484"],
-            "NSN": [""]
+            "OEM": ["05677484"]
         })
         sjabloon_buffer = io.BytesIO()
         with pd.ExcelWriter(sjabloon_buffer, engine='openpyxl') as writer:
@@ -430,7 +416,7 @@ with tab2:
         
         col_info, col_stijl, col_sjabloon = st.columns([2.5, 1.5, 1.2])
         with col_info:
-            st.write("Upload een `.xlsx` bestand met de verplichte kolommen **NCAGE**, **MPN** en **OEM** (plus optioneel **NSN**).")
+            st.write("Upload een `.xlsx` bestand met de verplichte kolommen **NCAGE**, **MPN** en **OEM**.")
         with col_stijl:
             batch_stijl = st.selectbox("Stijl voor ZIP-labels", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"])
         with col_sjabloon:
@@ -448,35 +434,28 @@ with tab2:
             df = pd.read_excel(excel_bestand)
             df.columns = df.columns.str.strip().str.upper()
             
-            # Strikt vereisen van NCAGE, MPN en OEM voor Construct 2
             if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
                 resultaten = []
                 zip_buffer = io.BytesIO()
-                heeft_nsn = 'NSN' in df.columns
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
                         ncage_raw = str(row['NCAGE']).strip().upper()
                         mpn_raw = str(row['MPN']).strip().upper()
                         oem_raw = str(row['OEM']).strip().upper()
-                        nsn_raw = str(row['NSN']).strip().upper() if heeft_nsn else ""
 
                         ncage_clean = "" if ncage_raw in ("NAN", "NONE") else ncage_raw
                         mpn_clean = "" if mpn_raw in ("NAN", "NONE") else mpn_raw
                         oem_clean = "" if oem_raw in ("NAN", "NONE") else oem_raw
-                        nsn_clean = "" if nsn_raw in ("NAN", "NONE") else nsn_raw
 
-                        # Sla volledig lege rijen over
                         if not (ncage_clean or mpn_clean or oem_clean):
                             continue
 
-                        # Strikt Construct 2 afdwingen
                         if not mpn_clean:
                             resultaten.append({
                                 "NCAGE": ncage_clean,
                                 "MPN": "",
                                 "OEM": oem_clean,
-                                "NSN": nsn_clean,
                                 "Construct": "Construct 2",
                                 "UII": "",
                                 "Lengte": 0,
@@ -495,7 +474,7 @@ with tab2:
                             try:
                                 img, decode_ok = genereer_label_afbeelding(
                                     ncage_clean, mpn_clean, oem_clean, syntax_string,
-                                    stijl=batch_stijl, nsn_clean=nsn_clean, construct="Construct 2"
+                                    stijl=batch_stijl, construct="Construct 2"
                                 )
                                 img_bytes = io.BytesIO()
                                 img.save(img_bytes, format="PNG")
@@ -509,7 +488,6 @@ with tab2:
                             "NCAGE": ncage_clean,
                             "MPN": mpn_clean,
                             "OEM": oem_clean,
-                            "NSN": nsn_clean,
                             "Construct": "Construct 2",
                             "UII": uii,
                             "Lengte": len(uii),
@@ -520,7 +498,6 @@ with tab2:
                 df_resultaten = pd.DataFrame(resultaten)
                 
                 if not df_resultaten.empty:
-                    # Duplicaat-detectie op geldige UII's
                     geldige_uiis = df_resultaten[df_resultaten['UII'] != ""]
                     duplicaten = geldige_uiis[geldige_uiis['UII'].duplicated(keep=False)]
                     if not duplicaten.empty:
