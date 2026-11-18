@@ -243,7 +243,11 @@ if not st.session_state["ingelogd"]:
 st.markdown("""
 <style>
     [data-testid="stToolbar"] { visibility: hidden; }
-    .stApp { background-color: #EEF0F3; }
+    .stApp {
+        background-color: #EEF0F3;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%23152232' fill-opacity='0.045' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
+        background-repeat: repeat;
+    }
     [data-testid="stSidebar"] {
         background-color: #E2E5E9;
         border-right: 1px solid #CFD4DC;
