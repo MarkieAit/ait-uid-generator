@@ -221,3 +221,101 @@ with tab1:
                         
                     except Exception as e:
                         st.error(f"❌ Fout bij genereren barcode: {e}")
+            else:
+                st.warning("⚠️ Vul alstublieft alle drie de velden in om de UID te genereren.")
+        else:
+            # Empty State: geeft duidelijke instructie zolang er nog niets is gegenereerd
+            st.info(
+                "👈 Vul links de **NCAGE**, **MPN** en het **OEM Serienummer** in en klik op "
+                "**Bereken UII & Genereer Label**.\n\n"
+                "Hier verschijnt direct het gevalideerde UII-nummer en het printklare MIL-STD-130 typeplaatje."
+            )
+
+# ==========================================
+# TAB 2: BATCH INVOER (EXCEL)
+# ==========================================
+with tab2:
+    st.subheader("Batch Verwerking via Excel")
+    
+    # Maak een leeg Excel-sjabloon aan in het geheugen
+    sjabloon_df = pd.DataFrame({
+        "NCAGE": ["A213N"],
+        "MPN": ["YS2R8X800"],
+        "OEM": ["05677484"]
+    })
+    sjabloon_buffer = io.BytesIO()
+    with pd.ExcelWriter(sjabloon_buffer, engine='openpyxl') as writer:
+        sjabloon_df.to_excel(writer, index=False)
+    
+    col_info, col_sjabloon = st.columns([3, 1])
+    with col_info:
+        st.write("Upload een `.xlsx` bestand met de kolommen **NCAGE**, **MPN** en **OEM** om meerdere UII's tegelijk te berekenen.")
+    with col_sjabloon:
+        st.download_button(
+            label="📄 Download Excel-sjabloon",
+            data=sjabloon_buffer.getvalue(),
+            file_name="DM&D_UID_Sjabloon.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+    excel_bestand = st.file_uploader("Sleep je Excel-bestand hierheen of klik op bladeren", type=["xlsx"])
+
+    if excel_bestand is not None:
+        df = pd.read_excel(excel_bestand)
+        df.columns = df.columns.str.strip().str.upper()
+        
+        st.write("Voorbeeld van de ingeladen data:")
+        st.dataframe(df, use_container_width=True)
+        
+        if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
+            resultaten = []
+            
+            for index, row in df.iterrows():
+                ncage_clean = str(row['NCAGE']).strip().upper()
+                mpn_clean = str(row['MPN']).strip().upper()
+                oem_clean = str(row['OEM']).strip().upper()
+                
+                if ncage_clean and ncage_clean != 'NAN':
+                    uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
+                    syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
+                    
+                    resultaten.append({
+                        "NCAGE": ncage_clean,
+                        "MPN": mpn_clean,
+                        "OEM": oem_clean,
+                        "Berekende UII": uii,
+                        "ISO 15434 Syntax": syntax_string
+                    })
+            
+            df_resultaten = pd.DataFrame(resultaten)
+            
+            if not df_resultaten.empty:
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_resultaten.to_excel(writer, index=False)
+                excel_data = output.getvalue()
+                
+                st.success(f"✅ {len(df_resultaten)} regels succesvol verwerkt en klaar voor download!")
+                
+                st.download_button(
+                    label="📥 Download Verwerkte Lijst (.xlsx)",
+                    data=excel_data,
+                    file_name="DM&D_UID_Batch_Resultaten.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
+        else:
+            st.error("❌ Fout: De geüploade Excel mist één of meerdere verplichte kolommen (NCAGE, MPN of OEM). Gebruik het sjabloon rechtsboven.")
+
+# 5. Footer (Naam / Eigenaarschap onderaan de pagina)
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #555; font-size: 14px;'>
+        <strong>Ontwikkeld door: Marco van Dijk</strong><br>
+        Projectleider AIT / UID | Directie Materieel & Diensten (DM&D) / CLAS
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
