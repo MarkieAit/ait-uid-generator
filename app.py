@@ -14,12 +14,37 @@ import io
 import json
 import re
 import zipfile
-from datetime import datetime
+from datetime import datetime, date
 from pylibdmtx.pylibdmtx import encode, decode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+# ==========================================
+# LICENTIE- & DEMO-INSTELLINGEN (PAS HIER AAN)
+# ==========================================
+VERLOOPDATUM = date(2026, 12, 31)   # Jaar, Maand, Dag
+MAX_DEMO_BATCH_REGELS = 5           # Maximaal aantal Excel-regels in proefversie
+CONTACT_NAAM = "Marco van Dijk"
+CONTACT_INFO = "marco@voorbeeld.nl" # Vul hier je e-mailadres of telefoonnummer in
+# ==========================================
+
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
 st.set_page_config(page_title="UID Studio™ | MIL-STD-130 & STANAG 2290 Generator", layout="wide")
+
+# --- CONTROLE VERLOOPDATUM ---
+vandaag = date.today()
+if vandaag > VERLOOPDATUM:
+    st.markdown("""
+        <div style="background-color: #152232; padding: 1.5rem 2rem; border-bottom: 4px solid #E17000; margin-bottom: 1.5rem;">
+            <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">UID Studio™ &nbsp;|&nbsp; Licentie Verlopen</span>
+            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">Proefversie is afgelopen</h1>
+        </div>
+    """, unsafe_allow_html=True)
+    st.error(
+        f"🔒 De proefperiode van **UID Studio™** is verlopen op **{VERLOOPDATUM.strftime('%d-%m-%Y')}**.\n\n"
+        f"Neem contact op met **{CONTACT_NAAM}** ({CONTACT_INFO}) om te kijken naar een passende oplossing of volledige licentie."
+    )
+    st.stop()
+# --- EINDE CONTROLE VERLOOPDATUM ---
 
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
@@ -297,15 +322,21 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 
     return label_img, decode_ok
 
-# 3. Zijbalk (Product info)
+# 3. Zijbalk (Product info & Licentiestatus)
+dagen_over = (VERLOOPDATUM - vandaag).days
 with st.sidebar:
     st.header("UID Studio™")
     st.write("Onafhankelijke tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).")
     st.info("📌 **Standaardkeuze:**\n- **Construct 2:** `CAGE + MPN + SN` (meest gebruikt in asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)")
+    st.warning(
+        f"⏳ **Proefversie actief**\n"
+        f"- Geldig t/m: **{VERLOOPDATUM.strftime('%d-%m-%Y')}** ({dagen_over} dagen)\n"
+        f"- Excel-batch: max. **{MAX_DEMO_BATCH_REGELS} regels** per upload"
+    )
     st.markdown("---")
     st.caption("**UID Studio™**")
-    st.caption("Versie: v2.5 (Independent Edition)")
-    st.caption("© 2026 Marco van Dijk")
+    st.caption("Versie: v2.6 (Demo Edition)")
+    st.caption(f"© 2026 {CONTACT_NAAM}")
 
 # 4. Strakke donkere Header Banner
 st.markdown("""
@@ -516,8 +547,8 @@ with tab2:
     with st.container(border=True):
         st.subheader("Batch Verwerking via Excel")
         st.info(
-            "ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. "
-            "Voeg optioneel de kolom **ERP_SLEUTEL** toe (bijv. SAP Equipment-nummer) om de output direct terug te kunnen laden in je ERP-systeem."
+            f"ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. "
+            f"Voeg optioneel **ERP_SLEUTEL** toe voor ERP-import. *(Proefversie: max. {MAX_DEMO_BATCH_REGELS} regels per upload)*"
         )
         
         sjabloon_df = pd.DataFrame({
@@ -552,6 +583,16 @@ with tab2:
             df.columns = df.columns.str.strip().str.upper()
             
             if set(['NCAGE', 'OEM']).issubset(df.columns):
+                # Demo-limiet toepassen op aantal regels
+                totaal_regels = len(df)
+                if totaal_regels > MAX_DEMO_BATCH_REGELS:
+                    st.warning(
+                        f"⚠️ **Proefversie-limiet bereikt:** Uw bestand bevat {totaal_regels} regels. "
+                        f"In deze demo worden de eerste **{MAX_DEMO_BATCH_REGELS} regels** verwerkt. "
+                        f"Neem contact op met **{CONTACT_NAAM}** ({CONTACT_INFO}) voor onbeperkte batchverwerking."
+                    )
+                    df = df.head(MAX_DEMO_BATCH_REGELS)
+
                 resultaten = []
                 zip_buffer = io.BytesIO()
                 heeft_mpn = 'MPN' in df.columns
@@ -559,7 +600,6 @@ with tab2:
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
-                        # ERP_SLEUTEL behoudt exacte opmaak (geen .upper())
                         sleutel_raw = str(row['ERP_SLEUTEL']).strip() if (heeft_sleutel and pd.notna(row['ERP_SLEUTEL'])) else ""
                         sleutel_clean = "" if sleutel_raw.upper() in ("NAN", "NONE") else sleutel_raw
 
@@ -662,9 +702,9 @@ with tab2:
 # 5. Footer (Eigenaarschap, Copyright & Disclaimer)
 st.markdown("---")
 st.markdown(
-    """
+    f"""
     <div style='text-align: center; color: #555; font-size: 13px;'>
-        <strong>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong>Marco van Dijk</strong> — Alle rechten voorbehouden.<br>
+        <strong>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong>{CONTACT_NAAM}</strong> — Alle rechten voorbehouden.<br>
         Onafhankelijke software op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).<br>
         <span style='font-size: 11px; color: #777;'>Disclaimer: Gebruik op eigen risico. De gebruiker blijft zelf verantwoordelijk voor de fysieke printkwaliteit en optische verificatie (ISO/IEC 15415).</span>
     </div>
