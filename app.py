@@ -272,7 +272,7 @@ st.markdown("""
         border-right: 1px solid #E2E8F0;
     }
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 3rem;
         padding-bottom: 1rem;
     }
     .stButton > button,
