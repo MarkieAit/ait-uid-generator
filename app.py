@@ -22,23 +22,16 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 # ==========================================
 # LICENTIE- & CONTACTINSTELLINGEN
 # ==========================================
-VERLOOPDATUM = date(2026, 12, 31)     # ISO: YYYY-MM-DD
-MAX_DEMO_BATCH_REGELS = 5             # Max. Excel rows in trial
+VERLOOPDATUM = date(2026, 12, 31)          # ISO: YYYY-MM-DD
+MAX_DEMO_BATCH_REGELS = 5                  # Max. Excel rows in trial
 CONTACT_NAAM = "Marco van Dijk"
-CONTACT_EMAIL = "marco@voorbeeld.nl"  # Vul hier je zakelijke e-mailadres in
+CONTACT_EMAIL = "7.spek_amp@icloud.com"
 # ==========================================
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
 st.set_page_config(page_title="UID Studio™ | MIL-STD-130 & STANAG 2290", layout="wide")
 
 # Initialiseer sessie-status
-if "taal" not in st.session_state:
-    st.session_state["taal"] = "NL"
-if "ingelogd" not in st.session_state:
-    st.session_state["ingelogd"] = False
-if "historie" not in st.session_state:
-    st.session_state["historie"] = []
-    # Initialiseer sessie-status
 if "taal" not in st.session_state:
     st.session_state["taal"] = "NL"
 if "ingelogd" not in st.session_state:
@@ -53,8 +46,6 @@ if "mpn_input" not in st.session_state:
     st.session_state["mpn_input"] = "YS2R8X800"
 if "oem_input" not in st.session_state:
     st.session_state["oem_input"] = "05677484"
-
-
 
 # ==========================================
 # VERTALINGEN (NL / EN)
@@ -117,7 +108,7 @@ TEXT = {
         "syntax_copy_lbl": "**ISO 15434 Syntax (kopieerbaar):**",
         "exp_json": "Machine-Readable JSON",
         "err_barcode": "❌ Fout bij genereren barcode: {e}",
-        "empty_info": "👈 Vul links de gegevens in of klik op **⚡ Voorbeeld** om direct een MIL-STD-130N label te testen.\n\nAlle verwerking gebeurt volledig in het geheugen (Zero Data Retention).",
+        "empty_info": "👈 Klik op **Genereer UII & Label** om direct het voorbeeldlabel te testen, of pas de gegevens links aan.\n\nAlle verwerking gebeurt volledig in het geheugen (Zero Data Retention).",
         "hist_title": "🕒 Recente Labels (Deze Sessie)",
         "btn_dl_again": "⬇️ PNG",
         "batch_title": "Batch Verwerking via Excel",
@@ -202,7 +193,7 @@ TEXT = {
         "syntax_copy_lbl": "**ISO 15434 Syntax (copyable):**",
         "exp_json": "Machine-Readable JSON",
         "err_barcode": "❌ Error generating barcode: {e}",
-        "empty_info": "👈 Enter your asset data on the left or click **⚡ Sample** to test a MIL-STD-130N label right away.\n\nAll processing runs strictly in-memory (Zero Data Retention).",
+        "empty_info": "👈 Click **Generate UII & Label** to test the sample label right away, or edit the fields on the left.\n\nAll processing runs strictly in-memory (Zero Data Retention).",
         "hist_title": "🕒 Recent Labels (This Session)",
         "btn_dl_again": "⬇️ PNG",
         "batch_title": "Batch Processing via Excel",
@@ -258,10 +249,27 @@ def render_upgrade_card(title, body, cta_label, sub_text):
         </div>
     """, unsafe_allow_html=True)
 
+def render_footer(T):
+    """Toont de eigenaarschap- en copyright-voettekst."""
+    st.markdown("---")
+    st.markdown(
+        f"""
+        <div style='text-align: center; color: #64748B; font-size: 13px;'>
+            <strong style='color: #0F172A;'>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong style='color: #0F172A;'>{CONTACT_NAAM}</strong> — {T['footer_rights']}<br>
+            {T['footer_sub']}<br>
+            <span style='font-size: 11px; color: #94A3B8;'>{T['footer_disc']}</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 # 2. Moderne B2B SaaS Styling (CSS Injectie + Subtiel Watermerk)
 st.markdown("""
 <style>
     [data-testid="stToolbar"] { visibility: hidden; }
+    header[data-testid="stHeader"] {
+        background: transparent;
+    }
     .stApp {
         background-color: #F8FAFC;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%230F172A' fill-opacity='0.035' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
@@ -270,13 +278,10 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #F1F5F9;
         border-right: 1px solid #E2E8F0;
-    }header[data-testid="stHeader"] {
-        background: transparent;
     }
     .block-container {
         padding-top: 3rem;
         padding-bottom: 1rem;
-    }
     }
     .stButton > button,
     .stDownloadButton > button,
@@ -497,6 +502,7 @@ if vandaag > VERLOOPDATUM:
         cta_label=T["upgrade_cta"],
         sub_text=T["upgrade_sub"]
     )
+    render_footer(T)
     st.stop()
 # --- EINDE CONTROLE VERLOOPDATUM ---
 
@@ -514,6 +520,7 @@ if not st.session_state["ingelogd"]:
     juiste_wachtwoord = get_app_password()
     if juiste_wachtwoord is None:
         st.error(T["secret_err"])
+        render_footer(T)
         st.stop()
 
     wachtwoord = st.text_input(T["login_prompt"], type="password")
@@ -523,6 +530,7 @@ if not st.session_state["ingelogd"]:
     else:
         if wachtwoord != "":
             st.error(T["login_err"])
+        render_footer(T)
         st.stop()
 # --- EINDE BEVEILIGING ---
 
@@ -682,7 +690,7 @@ with st.sidebar:
     st.warning(T["sidebar_demo"].format(datum=iso_verloop, dagen=dagen_over, max_regels=MAX_DEMO_BATCH_REGELS))
     st.markdown("---")
     st.caption("**UID Studio™**")
-    st.caption("Version: v3.0 (B2B International)")
+    st.caption("Version: v3.1 (B2B International)")
     st.caption(f"© 2026 {CONTACT_NAAM}")
 
 # 4. Moderne B2B Header Banner met Zero Data Retention Trust Badge
@@ -815,7 +823,6 @@ with tab1:
                                 </div>
                             """, unsafe_allow_html=True)
 
-                            # Eén-klik kopiëren voor de berekende UII
                             st.caption(T["uii_copy_lbl"])
                             st.code(uii, language=None)
 
@@ -830,7 +837,6 @@ with tab1:
                                 use_container_width=True
                             )
 
-                            # Industriële Pro-exportformaten (Roadmap / Conversie)
                             st.caption(T["pro_export_lbl"])
                             pro_c1, pro_c2, pro_c3 = st.columns(3)
                             with pro_c1:
@@ -907,7 +913,6 @@ with tab2:
         st.subheader(T["batch_title"])
         st.info(T["batch_info"].format(max_regels=MAX_DEMO_BATCH_REGELS))
         
-        # Internationaal sjabloon (met ondersteuning voor NL aliassen bij upload)
         sjabloon_df = pd.DataFrame({
             "ERP_KEY": ["10004582"],
             "CAGE": ["A213N"],
@@ -944,14 +949,12 @@ with tab2:
 
             df.columns = df.columns.str.strip().str.upper()
 
-            # Internationale & Nederlandse kolom-aliassen automatisch herkennen
             col_cage = vind_kolom(df.columns, ["CAGE", "NCAGE", "CAGE_CODE", "NCAGE_CODE"])
             col_sn = vind_kolom(df.columns, ["SN", "SERIAL", "SERIAL_NUMBER", "SERIENUMMER", "OEM"])
             col_mpn = vind_kolom(df.columns, ["MPN", "PART_NUMBER", "PART_NO", "PN", "P/N"])
             col_key = vind_kolom(df.columns, ["ERP_KEY", "ERP_SLEUTEL", "ASSET_ID", "EQUIPMENT_ID", "KEY"])
             
             if col_cage and col_sn:
-                # Verwijder volledig lege rijen vóór de demo-limiet
                 df = df.replace(r'^\s*$', pd.NA, regex=True).dropna(how="all")
 
                 totaal_regels = len(df)
@@ -1088,14 +1091,4 @@ with tab2:
                 st.error(T["err_cols"])
 
 # 5. Footer (Eigenaarschap, Copyright & Disclaimer)
-st.markdown("---")
-st.markdown(
-    f"""
-    <div style='text-align: center; color: #64748B; font-size: 13px;'>
-        <strong style='color: #0F172A;'>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong style='color: #0F172A;'>{CONTACT_NAAM}</strong> — {T['footer_rights']}<br>
-        {T['footer_sub']}<br>
-        <span style='font-size: 11px; color: #94A3B8;'>{T['footer_disc']}</span>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
+render_footer(T)
