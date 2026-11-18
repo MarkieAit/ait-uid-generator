@@ -24,7 +24,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 VERLOOPDATUM = date(2026, 12, 31)   # Jaar, Maand, Dag
 MAX_DEMO_BATCH_REGELS = 5           # Maximaal aantal Excel-regels in proefversie
 CONTACT_NAAM = "Marco van Dijk"
-CONTACT_INFO = "marco@voorbeeld.nl" # Vul hier je e-mailadres of telefoonnummer in
+CONTACT_INFO = "7.spek_amp@icloud.com" # Vul hier je e-mailadres of telefoonnummer in
 # ==========================================
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
