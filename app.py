@@ -13,6 +13,7 @@ import pandas as pd
 import io
 import json
 import re
+import html
 import zipfile
 from datetime import datetime, date
 from pylibdmtx.pylibdmtx import encode, decode
@@ -24,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 VERLOOPDATUM = date(2026, 12, 31)   # Jaar, Maand, Dag
 MAX_DEMO_BATCH_REGELS = 5           # Maximaal aantal Excel-regels in proefversie
 CONTACT_NAAM = "Marco van Dijk"
-CONTACT_INFO = "7.spek_amp@icloud.com" # Vul hier je e-mailadres of telefoonnummer in
+CONTACT_INFO = "marco@voorbeeld.nl" # Vul hier je e-mailadres of telefoonnummer in
 # ==========================================
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
@@ -50,6 +51,7 @@ TEXT = {
         "login_title": "UID Studio™ — Generator &amp; Validator",
         "login_prompt": "Voer het toegangswachtwoord in:",
         "login_err": "❌ Onjuist wachtwoord. Toegang geweigerd.",
+        "secret_err": "❌ Configuratiefout: Stel `app_wachtwoord` in via Streamlit Secrets.",
         "sidebar_desc": "Onafhankelijke tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
         "sidebar_std": "📌 **Standaardkeuze:**\n- **Construct 2:** `CAGE + MPN + SN` (meest gebruikt in asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)",
         "sidebar_demo": "⏳ **Proefversie actief**\n- Geldig t/m: **{datum}** ({dagen} dagen)\n- Excel-batch: max. **{max_regels} regels** per upload",
@@ -100,9 +102,11 @@ TEXT = {
         "batch_style_lbl": "Stijl voor ZIP-labels",
         "btn_template": "📄 Excel-sjabloon",
         "uploader_lbl": "Sleep je Excel-bestand hierheen of klik op bladeren",
-        "demo_limit_warn": "⚠️ **Proefversie-limiet bereikt:** Uw bestand bevat {totaal} regels. In deze demo worden de eerste **{max_regels} regels** verwerkt. Neem contact op met **{naam}** ({contact}) voor onbeperkte batchverwerking.",
+        "err_excel_read": "❌ Kon het Excel-bestand niet lezen. Controleer of het een geldig, onbeveiligd `.xlsx`-bestand is.",
+        "demo_limit_warn": "⚠️ **Proefversie-limiet bereikt:** Uw bestand bevat {totaal} gevulde regels. In deze demo worden de eerste **{max_regels} regels** verwerkt. Neem contact op met **{naam}** ({contact}) voor onbeperkte batchverwerking.",
         "status_ok": "OK",
-        "status_err_len": "FOUT (>50 tekens, NCAGE≠5 of OEM leeg)",
+        "status_err_chars": "FOUT (Ongeldige tekens/spaties)",
+        "status_err_limits": "FOUT (Veldlimiet: NCAGE=5, MPN≤32, SN≤30, UII≤50)",
         "status_warn_dec": "WAARSCHUWING (Decode check)",
         "status_err_bc": "FOUT (Barcode)",
         "dup_warn": "⚠️ **Duplicaat-detectie:** De volgende UII('s) komen vaker voor in dit bestand: `{dups}`",
@@ -110,6 +114,7 @@ TEXT = {
         "badge_rows": "✓ {n} REGELS VERWERKT",
         "btn_dl_xlsx": "📥 Download Verwerkte Lijst (.xlsx)",
         "btn_dl_zip": "📦 Download Alle Labels (.zip)",
+        "no_valid_zip": "ℹ️ Geen geldige labels gegenereerd om als ZIP te downloaden.",
         "err_cols": "❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal **NCAGE** en **OEM**). Gebruik het sjabloon rechtsboven.",
         "footer_rights": "Alle rechten voorbehouden.",
         "footer_sub": "Onafhankelijke software op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).",
@@ -123,6 +128,7 @@ TEXT = {
         "login_title": "UID Studio™ — Generator &amp; Validator",
         "login_prompt": "Enter access password:",
         "login_err": "❌ Incorrect password. Access denied.",
+        "secret_err": "❌ Configuration error: Set `app_wachtwoord` in Streamlit Secrets.",
         "sidebar_desc": "Independent tool for validating and generating machine-readable MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
         "sidebar_std": "📌 **Standard Selection:**\n- **Construct 2:** `CAGE + MPN + SN` (standard for asset management)\n- **Construct 1:** `CAGE + SN` (for globally unique serial numbers)",
         "sidebar_demo": "⏳ **Trial Version Active**\n- Valid until: **{datum}** ({dagen} days)\n- Excel batch: max. **{max_regels} rows** per upload",
@@ -173,9 +179,11 @@ TEXT = {
         "batch_style_lbl": "Style for ZIP labels",
         "btn_template": "📄 Excel Template",
         "uploader_lbl": "Drag and drop your Excel file here or click to browse",
-        "demo_limit_warn": "⚠️ **Trial limit reached:** Your file contains {totaal} rows. In this demo, only the first **{max_regels} rows** are processed. Contact **{naam}** ({contact}) for unlimited batch processing.",
+        "err_excel_read": "❌ Could not read the Excel file. Please verify it is a valid, unprotected `.xlsx` file.",
+        "demo_limit_warn": "⚠️ **Trial limit reached:** Your file contains {totaal} non-empty rows. In this demo, only the first **{max_regels} rows** are processed. Contact **{naam}** ({contact}) for unlimited batch processing.",
         "status_ok": "OK",
-        "status_err_len": "ERROR (>50 chars, NCAGE≠5 or OEM empty)",
+        "status_err_chars": "ERROR (Invalid characters/spaces)",
+        "status_err_limits": "ERROR (Field limits: NCAGE=5, MPN≤32, SN≤30, UII≤50)",
         "status_warn_dec": "WARNING (Decode check)",
         "status_err_bc": "ERROR (Barcode)",
         "dup_warn": "⚠️ **Duplicate detection:** The following UII(s) appear multiple times in this file: `{dups}`",
@@ -183,6 +191,7 @@ TEXT = {
         "badge_rows": "✓ {n} ROWS PROCESSED",
         "btn_dl_xlsx": "📥 Download Processed List (.xlsx)",
         "btn_dl_zip": "📦 Download All Labels (.zip)",
+        "no_valid_zip": "ℹ️ No valid labels were generated for ZIP download.",
         "err_cols": "❌ Error: The uploaded Excel file is missing required columns (at least **NCAGE** and **OEM**). Use the template above.",
         "footer_rights": "All rights reserved.",
         "footer_sub": "Independent software based on open standards (MIL-STD-130N / STANAG 2290 / ISO 15434).",
@@ -192,6 +201,17 @@ TEXT = {
 
 def get_lang_code():
     return "EN" if "English" in st.session_state["taal"] else "NL"
+
+def get_app_password():
+    """Haalt veilig het wachtwoord op uit Streamlit Secrets (met fallback voor migratie)."""
+    try:
+        if "app_wachtwoord" in st.secrets:
+            return st.secrets["app_wachtwoord"]
+        if "dmd_wachtwoord" in st.secrets:
+            return st.secrets["dmd_wachtwoord"]
+    except Exception:
+        pass
+    return None
 
 # Taalschakelaar tonen op inlog- of verlopen-scherm (als nog niet ingelogd)
 vandaag = date.today()
@@ -229,8 +249,13 @@ if not st.session_state["ingelogd"]:
             <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">{T['login_title']}</h1>
         </div>
     """, unsafe_allow_html=True)
+    juiste_wachtwoord = get_app_password()
+    if juiste_wachtwoord is None:
+        st.error(T["secret_err"])
+        st.stop()
+
     wachtwoord = st.text_input(T["login_prompt"], type="password")
-    if wachtwoord == st.secrets["dmd_wachtwoord"]:
+    if wachtwoord == juiste_wachtwoord:
         st.session_state["ingelogd"] = True
         st.rerun()
     else:
@@ -239,13 +264,13 @@ if not st.session_state["ingelogd"]:
         st.stop()
 # --- EINDE BEVEILIGING ---
 
-# 2. Styling (CSS Injectie)
+# 2. Styling (CSS Injectie + Subtiel Achtergrond-watermerk)
 st.markdown("""
 <style>
     [data-testid="stToolbar"] { visibility: hidden; }
     .stApp {
         background-color: #EEF0F3;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%23152232' fill-opacity='0.05' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%23152232' fill-opacity='0.045' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
         background-repeat: repeat;
     }
     [data-testid="stSidebar"] {
@@ -392,26 +417,31 @@ def bevat_ongeldige_tekens(tekst):
     return bool(re.search(r'[^A-Za-z0-9\-/]', tekst))
 
 def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, sn_label, construct="Construct 2"):
-    """Bouwt een kleurgecodeerde ASCII en HEX weergave van de ISO 15434 Format 06 syntax."""
+    """Bouwt een kleurgecodeerde ASCII en HEX weergave met HTML-escaping tegen XSS."""
+    ncage_esc = html.escape(ncage_clean)
+    mpn_esc = html.escape(mpn_clean)
+    oem_esc = html.escape(oem_clean)
+    sn_lbl_esc = html.escape(sn_label)
+
     if construct == "Construct 2":
         ascii_html = (
             '<span class="tok-hdr">[)&gt;</span>'
             '<span class="tok-ctrl">RS</span>'
             '<span class="tok-hdr">06</span>'
             '<span class="tok-ctrl">GS</span>'
-            f'<span class="tok-17v">17V{ncage_clean}</span>'
+            f'<span class="tok-17v">17V{ncage_esc}</span>'
             '<span class="tok-ctrl">GS</span>'
-            f'<span class="tok-1p">1P{mpn_clean}</span>'
+            f'<span class="tok-1p">1P{mpn_esc}</span>'
             '<span class="tok-ctrl">GS</span>'
-            f'<span class="tok-s">S{oem_clean}</span>'
+            f'<span class="tok-s">S{oem_esc}</span>'
             '<span class="tok-ctrl">RS</span>'
             '<span class="tok-ctrl">EOT</span>'
         )
-        hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;1P{mpn_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
+        hex_str = f"[)&gt;&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_esc}&lt;0x1D&gt;1P{mpn_esc}&lt;0x1D&gt;S{oem_esc}&lt;0x1E&gt;&lt;0x04&gt;"
         di_html = (
-            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_clean}</div>'
-            f'<div class="di-row"><span class="tok-1p">1P</span> <strong>MPN:</strong> {mpn_clean}</div>'
-            f'<div class="di-row"><span class="tok-s">S</span> <strong>{sn_label}:</strong> {oem_clean}</div>'
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_esc}</div>'
+            f'<div class="di-row"><span class="tok-1p">1P</span> <strong>MPN:</strong> {mpn_esc}</div>'
+            f'<div class="di-row"><span class="tok-s">S</span> <strong>{sn_lbl_esc}:</strong> {oem_esc}</div>'
         )
     else:
         ascii_html = (
@@ -419,21 +449,36 @@ def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, sn_label, construc
             '<span class="tok-ctrl">RS</span>'
             '<span class="tok-hdr">06</span>'
             '<span class="tok-ctrl">GS</span>'
-            f'<span class="tok-17v">17V{ncage_clean}</span>'
+            f'<span class="tok-17v">17V{ncage_esc}</span>'
             '<span class="tok-ctrl">GS</span>'
-            f'<span class="tok-s">S{oem_clean}</span>'
+            f'<span class="tok-s">S{oem_esc}</span>'
             '<span class="tok-ctrl">RS</span>'
             '<span class="tok-ctrl">EOT</span>'
         )
-        hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
+        hex_str = f"[)&gt;&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_esc}&lt;0x1D&gt;S{oem_esc}&lt;0x1E&gt;&lt;0x04&gt;"
         di_html = (
-            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_clean}</div>'
-            f'<div class="di-row"><span class="tok-s">S</span> <strong>{sn_label}:</strong> {oem_clean}</div>'
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_esc}</div>'
+            f'<div class="di-row"><span class="tok-s">S</span> <strong>{sn_lbl_esc}:</strong> {oem_esc}</div>'
         )
     return ascii_html, hex_str, di_html
 
+def laad_passend_font(draw, regels, max_breedte_px=380, start_grootte=36, min_grootte=16):
+    """Schaalt het lettertype automatisch omlaag zodat lange tekst nooit de Data Matrix overlapt."""
+    font_pad = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    for grootte in range(start_grootte, min_grootte - 1, -2):
+        try:
+            font = ImageFont.truetype(font_pad, grootte)
+        except Exception:
+            return ImageFont.load_default()
+        if max(draw.textlength(r, font=font) for r in regels) <= max_breedte_px:
+            return font
+    try:
+        return ImageFont.truetype(font_pad, min_grootte)
+    except Exception:
+        return ImageFont.load_default()
+
 def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, is_laser=True, construct="Construct 2"):
-    """Genereert het label (PNG Image) én voert direct een decode self-check uit."""
+    """Genereert het label (PNG Image) met gegarandeerde Quiet Zone én decode self-check."""
     barcode_data = syntax_string.replace('[RS]', chr(30)).replace('[GS]', chr(29)).replace('[EOT]', chr(4))
     
     encoded = encode(barcode_data.encode('utf-8'))
@@ -474,10 +519,9 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
         regels.append(f"MPN:   {mpn_clean}")
     regels.append(f"SN:    {oem_clean}")
 
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 36)
-    except Exception:
-        font = ImageFont.load_default()
+    # Beschikbare breedte links van de barcode minus ruime Quiet Zone (45px links + 30px marge voor barcode)
+    max_tekst_breedte = max(200, x_pos_barcode - 75)
+    font = laad_passend_font(draw, regels, max_breedte_px=max_tekst_breedte)
 
     start_y = 75 if len(regels) == 3 else 110
     stap_y = 80
@@ -496,7 +540,6 @@ with st.sidebar:
         key="taal",
         label_visibility="collapsed"
     )
-    # Herlaad actieve vertaling na mogelijke wissel in zijbalk
     lang = get_lang_code()
     T = TEXT[lang]
 
@@ -507,7 +550,7 @@ with st.sidebar:
     st.warning(T["sidebar_demo"].format(datum=VERLOOPDATUM.strftime('%d-%m-%Y'), dagen=dagen_over, max_regels=MAX_DEMO_BATCH_REGELS))
     st.markdown("---")
     st.caption("**UID Studio™**")
-    st.caption("Version: v2.7 (Bilingual Demo)")
+    st.caption("Version: v2.8 (QA Hardened)")
     st.caption(f"© 2026 {CONTACT_NAAM}")
 
 # 4. Strakke donkere Header Banner
@@ -557,14 +600,12 @@ with tab1:
                 
             oem = st.text_input(T["sn_lbl"], max_chars=30, key="oem_input")
 
-            # Live 50-karakter UII teller
             huidige_uii_lengte = 1 + len(ncage.strip()) + (len(mpn.strip()) if construct_keuze == "Construct 2" else 0) + len(oem.strip())
             if huidige_uii_lengte > 50:
                 st.error(T["len_err"].format(lengte=huidige_uii_lengte))
             else:
                 st.caption(T["len_ok"].format(lengte=huidige_uii_lengte))
 
-            # Directe foutpreventie
             invoer_fout = False
             if ncage and bevat_ongeldige_tekens(ncage):
                 st.warning(T["warn_ncage"])
@@ -745,10 +786,18 @@ with tab2:
         excel_bestand = st.file_uploader(T["uploader_lbl"], type=["xlsx"])
 
         if excel_bestand is not None:
-            df = pd.read_excel(excel_bestand, dtype=str)
+            try:
+                df = pd.read_excel(excel_bestand, dtype=str)
+            except Exception:
+                st.error(T["err_excel_read"])
+                st.stop()
+
             df.columns = df.columns.str.strip().str.upper()
             
             if set(['NCAGE', 'OEM']).issubset(df.columns):
+                # Verwijder eerst volledig lege (of spatie-) rijen vóór de demo-limiet
+                df = df.replace(r'^\s*$', pd.NA, regex=True).dropna(how="all")
+
                 totaal_regels = len(df)
                 if totaal_regels > MAX_DEMO_BATCH_REGELS:
                     st.warning(T["demo_limit_warn"].format(
@@ -761,6 +810,7 @@ with tab2:
 
                 resultaten = []
                 zip_buffer = io.BytesIO()
+                geldige_labels_count = 0
                 heeft_mpn = 'MPN' in df.columns
                 heeft_sleutel = 'ERP_SLEUTEL' in df.columns
 
@@ -789,10 +839,25 @@ with tab2:
                             uii = f"D{ncage_clean}{oem_clean}"
                             syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]S{oem_clean}[RS][EOT]"
 
-                        lengte_ok = len(uii) <= 50 and len(ncage_clean) == 5 and bool(oem_clean)
-                        status = T["status_ok"] if lengte_ok else T["status_err_len"]
+                        # Strenge MIL-STD-130 karakter- en veldlimietvalidatie
+                        tekens_ok = not (
+                            bevat_ongeldige_tekens(ncage_clean)
+                            or (mpn_clean and bevat_ongeldige_tekens(mpn_clean))
+                            or bevat_ongeldige_tekens(oem_clean)
+                        )
+                        limieten_ok = (
+                            len(ncage_clean) == 5
+                            and len(mpn_clean) <= 32
+                            and 1 <= len(oem_clean) <= 30
+                            and len(uii) <= 50
+                        )
 
-                        if lengte_ok:
+                        if not tekens_ok:
+                            status = T["status_err_chars"]
+                        elif not limieten_ok:
+                            status = T["status_err_limits"]
+                        else:
+                            status = T["status_ok"]
                             try:
                                 img, decode_ok = genereer_label_afbeelding(
                                     ncage_clean, mpn_clean, oem_clean, syntax_string,
@@ -801,6 +866,7 @@ with tab2:
                                 img_bytes = io.BytesIO()
                                 img.save(img_bytes, format="PNG")
                                 zf.writestr(f"Label_{index+1}_{uii}.png", img_bytes.getvalue())
+                                geldige_labels_count += 1
                                 if not decode_ok:
                                     status = T["status_warn_dec"]
                             except Exception:
@@ -815,10 +881,10 @@ with tab2:
                             "MPN": mpn_clean,
                             "OEM": oem_clean,
                             "Construct": construct_type,
-                            "UII": uii,
-                            "Length" if lang == "EN" else "Lengte": len(uii),
+                            "UII": uii if (tekens_ok and limieten_ok) else "",
+                            "Length" if lang == "EN" else "Lengte": len(uii) if (tekens_ok and limieten_ok) else 0,
                             "Status": status,
-                            "ISO 15434 Syntax": syntax_string
+                            "ISO 15434 Syntax": syntax_string if (tekens_ok and limieten_ok) else ""
                         })
                         resultaten.append(rij_resultaat)
                 
@@ -855,13 +921,16 @@ with tab2:
                             use_container_width=True
                         )
                     with dl_col2:
-                        st.download_button(
-                            label=T["btn_dl_zip"],
-                            data=zip_buffer.getvalue(),
-                            file_name="UID_Studio_Batch_Labels.zip",
-                            mime="application/zip",
-                            use_container_width=True
-                        )
+                        if geldige_labels_count > 0:
+                            st.download_button(
+                                label=T["btn_dl_zip"],
+                                data=zip_buffer.getvalue(),
+                                file_name="UID_Studio_Batch_Labels.zip",
+                                mime="application/zip",
+                                use_container_width=True
+                            )
+                        else:
+                            st.info(T["no_valid_zip"])
             else:
                 st.error(T["err_cols"])
 
