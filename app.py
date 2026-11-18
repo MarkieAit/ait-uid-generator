@@ -199,7 +199,6 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
     # 6. Tekst (HRI) tekenen
     draw = ImageDraw.Draw(label_img)
     if not is_laser:
-        # Subtiele snijrand voor witte thermische stickers
         draw.rectangle([(0, 0), (749, 349)], outline="#CCCCCC", width=2)
 
     regels = [f"CAGE:  {ncage_clean}"]
@@ -215,7 +214,6 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
     except Exception:
         font = ImageFont.load_default()
 
-    # Verticale spreiding afstemmen op aantal regels
     start_y = 55 if len(regels) == 4 else 75
     stap_y = 65 if len(regels) == 4 else 80
     for idx, regel in enumerate(regels):
@@ -226,10 +224,11 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 # 3. Zijbalk (Project info & Governance)
 with st.sidebar:
     st.header("Project AIT / UID")
-    st.write("Deze tool valideert Construct 1 & 2 invoer en genereert machine-leesbare MIL-STD-130 / STANAG 2290 Data Matrix codes voor Defensie-materieel.")
+    st.write("Deze tool valideert invoer en genereert machine-leesbare MIL-STD-130 / STANAG 2290 Data Matrix codes voor Defensie-materieel.")
+    st.info("📌 **Defensie-richtlijn:** Voor regulier Defensie-materieel is **Construct 2** (`NCAGE + MPN + SN`) verplicht.")
     st.markdown("---")
     st.caption("**Ministerie van Defensie**")
-    st.caption("Versie: v2.0 (MIL-STD-130N)")
+    st.caption("Versie: v2.1 (MIL-STD-130N)")
     st.caption("Beheer: DM&D / CLAS")
 
 # 4. Strakke donkere Header Banner
@@ -254,9 +253,23 @@ with tab1:
             
             opt_col1, opt_col2 = st.columns(2)
             with opt_col1:
-                construct_keuze = st.radio("UID Construct", ["Construct 2", "Construct 1"], horizontal=True)
+                construct_keuze = st.radio(
+                    "UID Construct",
+                    ["Construct 2", "Construct 1"],
+                    horizontal=True,
+                    help="Binnen Defensie (materieelketen) is Construct 2 verplicht."
+                )
             with opt_col2:
                 label_stijl = st.radio("Label Uitvoering", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"], horizontal=True)
+
+            # Expliciete melding bij keuze voor Construct 1
+            if construct_keuze == "Construct 1":
+                st.warning(
+                    "⚠️ **Let op:** Binnen Defensie (materieelketen) is **Construct 2 verplicht**. "
+                    "Construct 1 wordt uitsluitend in specifieke uitzonderingen (zoals de medische keten) toegepast."
+                )
+            else:
+                st.caption("ℹ️ Defensie-standaard: **Construct 2** (`NCAGE + MPN + SN`) is verplicht voor materieel.")
 
             ncage = st.text_input("NCAGE-code (exact 5 karakters, bijv. A213N)", max_chars=5, key="ncage_input")
             
@@ -330,16 +343,20 @@ with tab1:
                                 stijl=label_stijl, nsn_clean=nsn_clean, construct=construct_keuze
                             )
 
-                            # Status-badges inclusief automatische Decode Self-Check
                             decode_badge = (
                                 '<span class="badge badge-ok">✓ DECODE GEVALIDEERD</span>'
                                 if decode_ok else
                                 '<span class="badge badge-warn">⚠ DECODE CHECK MISLUKT</span>'
                             )
+                            construct_badge = (
+                                '<span class="badge">CONSTRUCT 2</span>'
+                                if construct_keuze == "Construct 2" else
+                                '<span class="badge badge-warn">CONSTRUCT 1 (UITZONDERING)</span>'
+                            )
                             st.markdown(f"""
                                 <div class="badge-row">
                                     <span class="badge">MIL-STD-130N</span>
-                                    <span class="badge">{construct_keuze.upper()}</span>
+                                    {construct_badge}
                                     <span class="badge">ECC 200</span>
                                     {decode_badge}
                                 </div>
@@ -367,11 +384,10 @@ with tab1:
                             label_img.save(virtueel_bestand, format="PNG")
                             bytes_data = virtueel_bestand.getvalue()
                             
-                            bestandsnaam = f"Label_{uii}.png"
                             st.download_button(
                                 label="🖨️ Download & Print Label (.png)",
                                 data=bytes_data,
-                                file_name=bestandsnaam,
+                                file_name=f"Label_{uii}.png",
                                 mime="image/png",
                                 type="primary",
                                 use_container_width=True
@@ -384,22 +400,23 @@ with tab1:
                 st.markdown("""
                     <div class="badge-row">
                         <span class="badge">MIL-STD-130N</span>
-                        <span class="badge">STANAG 2290</span>
+                        <span class="badge">CONSTRUCT 2 VERPLICHT</span>
                         <span class="badge">ECC 200</span>
                     </div>
                 """, unsafe_allow_html=True)
                 st.info(
-                    "👈 Kies links het **UID Construct** en de **Label Uitvoering**, vul de gegevens in en klik op "
+                    "👈 Vul links de gegevens in (standaard **Construct 2**) en klik op "
                     "**Bereken UII & Genereer Label**.\n\n"
                     "De tool berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
                 )
 
 # ==========================================
-# TAB 2: BATCH INVOER (EXCEL)
+# TAB 2: BATCH INVOER (EXCEL - VAST CONSTRUCT 2)
 # ==========================================
 with tab2:
     with st.container(border=True):
-        st.subheader("Batch Verwerking via Excel")
+        st.subheader("Batch Verwerking via Excel (Vast: Construct 2)")
+        st.info("ℹ️ Conform Defensie-beleid verwerkt de batch-module uitsluitend **Construct 2** (`NCAGE + MPN + OEM`). Alle drie de kolommen zijn daarom verplicht.")
         
         sjabloon_df = pd.DataFrame({
             "NCAGE": ["A213N"],
@@ -413,14 +430,14 @@ with tab2:
         
         col_info, col_stijl, col_sjabloon = st.columns([2.5, 1.5, 1.2])
         with col_info:
-            st.write("Upload een `.xlsx` bestand met **NCAGE**, **MPN** (optioneel bij Construct 1) en **OEM** (plus optioneel **NSN**).")
+            st.write("Upload een `.xlsx` bestand met de verplichte kolommen **NCAGE**, **MPN** en **OEM** (plus optioneel **NSN**).")
         with col_stijl:
             batch_stijl = st.selectbox("Stijl voor ZIP-labels", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"])
         with col_sjabloon:
             st.download_button(
                 label="📄 Excel-sjabloon",
                 data=sjabloon_buffer.getvalue(),
-                file_name="DM&D_UID_Sjabloon.xlsx",
+                file_name="DM&D_UID_Sjabloon_Construct2.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
@@ -431,66 +448,81 @@ with tab2:
             df = pd.read_excel(excel_bestand)
             df.columns = df.columns.str.strip().str.upper()
             
-            if set(['NCAGE', 'OEM']).issubset(df.columns):
+            # Strikt vereisen van NCAGE, MPN en OEM voor Construct 2
+            if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
                 resultaten = []
                 zip_buffer = io.BytesIO()
-                heeft_mpn = 'MPN' in df.columns
                 heeft_nsn = 'NSN' in df.columns
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
-                        ncage_clean = str(row['NCAGE']).strip().upper()
-                        oem_clean = str(row['OEM']).strip().upper()
-                        mpn_raw = str(row['MPN']).strip().upper() if heeft_mpn else ""
-                        mpn_clean = "" if mpn_raw in ("NAN", "NONE", "") else mpn_raw
+                        ncage_raw = str(row['NCAGE']).strip().upper()
+                        mpn_raw = str(row['MPN']).strip().upper()
+                        oem_raw = str(row['OEM']).strip().upper()
                         nsn_raw = str(row['NSN']).strip().upper() if heeft_nsn else ""
-                        nsn_clean = "" if nsn_raw in ("NAN", "NONE", "") else nsn_raw
 
-                        if ncage_clean and ncage_clean != 'NAN' and oem_clean and oem_clean != 'NAN':
-                            if mpn_clean:
-                                construct_type = "Construct 2"
-                                uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
-                                syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
-                            else:
-                                construct_type = "Construct 1"
-                                uii = f"D{ncage_clean}{oem_clean}"
-                                syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]S{oem_clean}[RS][EOT]"
+                        ncage_clean = "" if ncage_raw in ("NAN", "NONE") else ncage_raw
+                        mpn_clean = "" if mpn_raw in ("NAN", "NONE") else mpn_raw
+                        oem_clean = "" if oem_raw in ("NAN", "NONE") else oem_raw
+                        nsn_clean = "" if nsn_raw in ("NAN", "NONE") else nsn_raw
 
-                            lengte_ok = len(uii) <= 50 and len(ncage_clean) == 5
-                            status = "OK" if lengte_ok else "FOUT (>50 tekens of NCAGE≠5)"
+                        # Sla volledig lege rijen over
+                        if not (ncage_clean or mpn_clean or oem_clean):
+                            continue
 
-                            # Genereer label en voeg toe aan ZIP
-                            if lengte_ok:
-                                try:
-                                    img, decode_ok = genereer_label_afbeelding(
-                                        ncage_clean, mpn_clean, oem_clean, syntax_string,
-                                        stijl=batch_stijl, nsn_clean=nsn_clean, construct=construct_type
-                                    )
-                                    img_bytes = io.BytesIO()
-                                    img.save(img_bytes, format="PNG")
-                                    zf.writestr(f"Label_{index+1}_{uii}.png", img_bytes.getvalue())
-                                    if not decode_ok:
-                                        status = "WAARSCHUWING (Decode check)"
-                                except Exception:
-                                    status = "FOUT (Barcode)"
-
+                        # Strikt Construct 2 afdwingen
+                        if not mpn_clean:
                             resultaten.append({
                                 "NCAGE": ncage_clean,
-                                "MPN": mpn_clean,
+                                "MPN": "",
                                 "OEM": oem_clean,
                                 "NSN": nsn_clean,
-                                "Construct": construct_type,
-                                "UII": uii,
-                                "Lengte": len(uii),
-                                "Status": status,
-                                "ISO 15434 Syntax": syntax_string
+                                "Construct": "Construct 2",
+                                "UII": "",
+                                "Lengte": 0,
+                                "Status": "FOUT (MPN ontbreekt - Construct 2 verplicht)",
+                                "ISO 15434 Syntax": ""
                             })
+                            continue
+
+                        uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
+                        syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
+
+                        lengte_ok = len(uii) <= 50 and len(ncage_clean) == 5 and bool(oem_clean)
+                        status = "OK" if lengte_ok else "FOUT (>50 tekens, NCAGE≠5 of OEM leeg)"
+
+                        if lengte_ok:
+                            try:
+                                img, decode_ok = genereer_label_afbeelding(
+                                    ncage_clean, mpn_clean, oem_clean, syntax_string,
+                                    stijl=batch_stijl, nsn_clean=nsn_clean, construct="Construct 2"
+                                )
+                                img_bytes = io.BytesIO()
+                                img.save(img_bytes, format="PNG")
+                                zf.writestr(f"Label_{index+1}_{uii}.png", img_bytes.getvalue())
+                                if not decode_ok:
+                                    status = "WAARSCHUWING (Decode check)"
+                            except Exception:
+                                status = "FOUT (Barcode)"
+
+                        resultaten.append({
+                            "NCAGE": ncage_clean,
+                            "MPN": mpn_clean,
+                            "OEM": oem_clean,
+                            "NSN": nsn_clean,
+                            "Construct": "Construct 2",
+                            "UII": uii,
+                            "Lengte": len(uii),
+                            "Status": status,
+                            "ISO 15434 Syntax": syntax_string
+                        })
                 
                 df_resultaten = pd.DataFrame(resultaten)
                 
                 if not df_resultaten.empty:
-                    # Duplicaat-detectie op UII
-                    duplicaten = df_resultaten[df_resultaten['UII'].duplicated(keep=False)]
+                    # Duplicaat-detectie op geldige UII's
+                    geldige_uiis = df_resultaten[df_resultaten['UII'] != ""]
+                    duplicaten = geldige_uiis[geldige_uiis['UII'].duplicated(keep=False)]
                     if not duplicaten.empty:
                         unieke_dups = ", ".join(duplicaten['UII'].unique())
                         st.warning(f"⚠️ **Duplicaat-detectie:** De volgende UII('s) komen vaker voor in dit bestand: `{unieke_dups}`")
@@ -498,6 +530,7 @@ with tab2:
                     st.markdown(f"""
                         <div class="badge-row">
                             <span class="badge">BATCH VERWERKING</span>
+                            <span class="badge">CONSTRUCT 2</span>
                             <span class="badge badge-ok">✓ {len(df_resultaten)} REGELS VERWERKT</span>
                         </div>
                     """, unsafe_allow_html=True)
@@ -527,7 +560,7 @@ with tab2:
                             use_container_width=True
                         )
             else:
-                st.error("❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal NCAGE en OEM). Gebruik het sjabloon rechtsboven.")
+                st.error("❌ Fout: Voor Construct 2 zijn de kolommen **NCAGE**, **MPN** en **OEM** verplicht. Gebruik het sjabloon rechtsboven.")
 
 # 5. Footer (Naam / Eigenaarschap onderaan de pagina)
 st.markdown("---")
