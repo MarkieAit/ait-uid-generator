@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 # ==========================================
 # LICENTIE- & DEMO-INSTELLINGEN (PAS HIER AAN)
 # ==========================================
-VERLOOPDATUM = date(2026, 11, 18)   # Jaar, Maand, Dag
+VERLOOPDATUM = date(2026, 11, 17)   # Jaar, Maand, Dag
 MAX_DEMO_BATCH_REGELS = 5           # Maximaal aantal Excel-regels in proefversie
 CONTACT_NAAM = "Marco van Dijk"
 CONTACT_INFO = "7.spek_amp@icloud.com" # Vul hier je e-mailadres of telefoonnummer in
