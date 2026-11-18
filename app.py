@@ -9,7 +9,7 @@ from pylibdmtx.pylibdmtx import encode, decode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
-st.set_page_config(page_title="MIL-STD-130 UID Generator | Defensie", layout="wide")
+st.set_page_config(page_title="UID Studio | MIL-STD-130 & STANAG 2290 Generator", layout="wide")
 
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
@@ -18,11 +18,11 @@ if "ingelogd" not in st.session_state:
 if not st.session_state["ingelogd"]:
     st.markdown("""
         <div style="background-color: #152232; padding: 1.5rem 2rem; border-bottom: 4px solid #E17000; margin-bottom: 1.5rem;">
-            <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">Ministerie van Defensie | DM&D</span>
-            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">MIL-STD-130 UID Generator</h1>
+            <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290</span>
+            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">UID Studio — Generator &amp; Validator</h1>
         </div>
     """, unsafe_allow_html=True)
-    wachtwoord = st.text_input("Voer het DM&D wachtwoord in:", type="password")
+    wachtwoord = st.text_input("Voer het toegangswachtwoord in:", type="password")
     if wachtwoord == st.secrets["dmd_wachtwoord"]:
         st.session_state["ingelogd"] = True
         st.rerun()
@@ -36,7 +36,7 @@ if not st.session_state["ingelogd"]:
 if "historie" not in st.session_state:
     st.session_state["historie"] = []
 
-# 2. Defensie UX Styling (CSS Injectie)
+# 2. Styling (CSS Injectie)
 st.markdown("""
 <style>
     [data-testid="stToolbar"] { visibility: hidden; }
@@ -94,14 +94,14 @@ st.markdown("""
         color: #154273 !important;
         border-bottom: 3px solid #E17000 !important;
     }
-    .defensie-header {
+    .app-header {
         background-color: #152232;
         padding: 1.2rem 1.8rem;
         border-bottom: 4px solid #E17000;
         margin-bottom: 1.2rem;
         border-radius: 2px;
     }
-    .defensie-kicker {
+    .app-kicker {
         color: #E17000;
         font-size: 12px;
         font-weight: 700;
@@ -110,7 +110,7 @@ st.markdown("""
         display: block;
         margin-bottom: 0.25rem;
     }
-    .defensie-title {
+    .app-title {
         color: #FFFFFF;
         font-size: 1.75rem;
         font-weight: 700;
@@ -203,7 +203,7 @@ def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, construct="Constru
         )
         hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;1P{mpn_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
         di_html = (
-            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>NCAGE:</strong> {ncage_clean}</div>'
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_clean}</div>'
             f'<div class="di-row"><span class="tok-1p">1P</span> <strong>MPN:</strong> {mpn_clean}</div>'
             f'<div class="di-row"><span class="tok-s">S</span> <strong>Serienummer:</strong> {oem_clean}</div>'
         )
@@ -221,7 +221,7 @@ def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, construct="Constru
         )
         hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
         di_html = (
-            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>NCAGE:</strong> {ncage_clean}</div>'
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>CAGE / NCAGE:</strong> {ncage_clean}</div>'
             f'<div class="di-row"><span class="tok-s">S</span> <strong>Serienummer:</strong> {oem_clean}</div>'
         )
     return ascii_html, hex_str, di_html
@@ -287,25 +287,25 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 
     return label_img, decode_ok
 
-# 3. Zijbalk (Project info & Governance)
+# 3. Zijbalk (Product info)
 with st.sidebar:
-    st.header("Project AIT / UID")
-    st.write("Deze tool valideert invoer en genereert machine-leesbare MIL-STD-130 / STANAG 2290 Data Matrix codes voor Defensie-materieel.")
-    st.info("📌 **Defensie-richtlijn:** Voor regulier Defensie-materieel is **Construct 2** (`NCAGE + MPN + SN`) verplicht.")
+    st.header("UID Studio")
+    st.write("Onafhankelijke tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).")
+    st.info("📌 **Standaardkeuze:**\n- **Construct 2:** `CAGE + MPN + SN` (meest gebruikt in asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)")
     st.markdown("---")
-    st.caption("**Ministerie van Defensie**")
-    st.caption("Versie: v2.3 (MIL-STD-130N)")
-    st.caption("Beheer: DM&D / CLAS")
+    st.caption("**UID Studio**")
+    st.caption("Versie: v2.4 (Independent Edition)")
+    st.caption("Auteur: Marco van Dijk")
 
 # 4. Strakke donkere Header Banner
 st.markdown("""
-    <div class="defensie-header">
-        <span class="defensie-kicker">Ministerie van Defensie &nbsp;|&nbsp; Directie Materieel &amp; Diensten (DM&amp;D)</span>
-        <div class="defensie-title">MIL-STD-130 UID Generator &amp; Validator</div>
+    <div class="app-header">
+        <span class="app-kicker">Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290</span>
+        <div class="app-title">UID Studio — Data Matrix Generator &amp; Validator</div>
     </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["🏷️ Enkel Label (Werkplaats)", "📊 Batch Verwerking (Excel)"])
+tab1, tab2 = st.tabs(["🏷️ Enkel Label", "📊 Batch Verwerking (Excel)"])
 
 # ==========================================
 # TAB 1: ENKEL LABEL
@@ -323,27 +323,24 @@ with tab1:
                     "UID Construct",
                     ["Construct 2", "Construct 1"],
                     horizontal=True,
-                    help="Binnen Defensie (materieelketen) is Construct 2 verplicht."
+                    help="Kies Construct 2 (CAGE + MPN + SN) of Construct 1 (CAGE + SN)."
                 )
             with opt_col2:
                 label_stijl = st.radio("Label Uitvoering", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"], horizontal=True)
 
-            if construct_keuze == "Construct 1":
-                st.warning(
-                    "⚠️ **Let op:** Binnen Defensie (materieelketen) is **Construct 2 verplicht**. "
-                    "Construct 1 wordt uitsluitend in specifieke uitzonderingen (zoals de medische keten) toegepast."
-                )
+            if construct_keuze == "Construct 2":
+                st.caption("ℹ️ **Construct 2:** Unieke identificatie via `CAGE/NCAGE + MPN + Serienummer`.")
             else:
-                st.caption("ℹ️ Defensie-standaard: **Construct 2** (`NCAGE + MPN + SN`) is verplicht voor materieel.")
+                st.caption("ℹ️ **Construct 1:** Unieke identificatie via `CAGE/NCAGE + Serienummer` (zonder MPN).")
 
-            ncage = st.text_input("NCAGE-code (exact 5 karakters, bijv. A213N)", max_chars=5, key="ncage_input")
+            ncage = st.text_input("CAGE / NCAGE-code (exact 5 karakters, bijv. A213N)", max_chars=5, key="ncage_input")
             
             if construct_keuze == "Construct 2":
                 mpn = st.text_input("MPN (max. 32 karakters, bijv. YS2R8X800)", max_chars=32, key="mpn_input")
             else:
                 mpn = ""
                 
-            oem = st.text_input("OEM Serienummer (max. 30 karakters, bijv. 05677484)", max_chars=30, key="oem_input")
+            oem = st.text_input("Serienummer (max. 30 karakters, bijv. 05677484)", max_chars=30, key="oem_input")
 
             # Live 50-karakter UII teller
             huidige_uii_lengte = 1 + len(ncage.strip()) + (len(mpn.strip()) if construct_keuze == "Construct 2" else 0) + len(oem.strip())
@@ -355,7 +352,7 @@ with tab1:
             # Directe foutpreventie
             invoer_fout = False
             if ncage and bevat_ongeldige_tekens(ncage):
-                st.warning("⚠️ NCAGE bevat spaties of ongeldige tekens.")
+                st.warning("⚠️ CAGE/NCAGE bevat spaties of ongeldige tekens.")
                 invoer_fout = True
             if construct_keuze == "Construct 2" and mpn and bevat_ongeldige_tekens(mpn):
                 st.warning("⚠️ MPN bevat spaties of ongeldige tekens.")
@@ -380,7 +377,7 @@ with tab1:
                     if invoer_fout:
                         st.error("❌ Corrigeer eerst de waarschuwingen in de invoervelden.")
                     elif len(ncage) != 5:
-                        st.error("❌ Fout: Een geldige NCAGE-code moet exact 5 karakters lang zijn (bijv. A213N).")
+                        st.error("❌ Fout: Een geldige CAGE/NCAGE-code moet exact 5 karakters lang zijn (bijv. A213N).")
                     elif huidige_uii_lengte > 50:
                         st.error("❌ Fout: De totale UII mag volgens MIL-STD-130 maximaal 50 karakters lang zijn.")
                     else:
@@ -420,16 +417,11 @@ with tab1:
                                 if decode_ok else
                                 '<span class="badge badge-warn">⚠ DECODE CHECK MISLUKT</span>'
                             )
-                            construct_badge = (
-                                '<span class="badge">CONSTRUCT 2</span>'
-                                if construct_keuze == "Construct 2" else
-                                '<span class="badge badge-warn">CONSTRUCT 1 (UITZONDERING)</span>'
-                            )
                             st.markdown(f"""
                                 <div class="badge-row">
                                     <span class="badge">MIL-STD-130N</span>
                                     <span class="badge">FORMAT 06</span>
-                                    {construct_badge}
+                                    <span class="badge">{construct_keuze.upper()}</span>
                                     {decode_badge}
                                 </div>
                             """, unsafe_allow_html=True)
@@ -479,13 +471,12 @@ with tab1:
                     <div class="badge-row">
                         <span class="badge">MIL-STD-130N</span>
                         <span class="badge">FORMAT 06</span>
-                        <span class="badge">CONSTRUCT 2 VERPLICHT</span>
+                        <span class="badge">ECC 200</span>
                     </div>
                 """, unsafe_allow_html=True)
                 st.info(
-                    "👈 Vul links de gegevens in (standaard **Construct 2**) en klik op "
-                    "**Bereken UII & Genereer Label**.\n\n"
-                    "De tool berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
+                    "👈 Vul links de gegevens in en klik op **Bereken UII & Genereer Label**.\n\n"
+                    "UID Studio berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
                 )
 
     # Sessie-historie onderaan Tab 1
@@ -509,12 +500,12 @@ with tab1:
                     )
 
 # ==========================================
-# TAB 2: BATCH INVOER (EXCEL - VAST CONSTRUCT 2)
+# TAB 2: BATCH INVOER (EXCEL)
 # ==========================================
 with tab2:
     with st.container(border=True):
-        st.subheader("Batch Verwerking via Excel (Vast: Construct 2)")
-        st.info("ℹ️ Conform Defensie-beleid verwerkt de batch-module uitsluitend **Construct 2** (`NCAGE + MPN + OEM`). Voorloopnullen in serienummers blijven automatisch behouden.")
+        st.subheader("Batch Verwerking via Excel")
+        st.info("ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. Voorloopnullen in serienummers blijven automatisch behouden.")
         
         sjabloon_df = pd.DataFrame({
             "NCAGE": ["A213N"],
@@ -527,14 +518,14 @@ with tab2:
         
         col_info, col_stijl, col_sjabloon = st.columns([2.5, 1.5, 1.2])
         with col_info:
-            st.write("Upload een `.xlsx` bestand met de verplichte kolommen **NCAGE**, **MPN** en **OEM**.")
+            st.write("Regels met een ingevulde **MPN** worden als **Construct 2** verwerkt; zonder MPN als **Construct 1**.")
         with col_stijl:
             batch_stijl = st.selectbox("Stijl voor ZIP-labels", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"])
         with col_sjabloon:
             st.download_button(
                 label="📄 Excel-sjabloon",
                 data=sjabloon_buffer.getvalue(),
-                file_name="DM&D_UID_Sjabloon_Construct2.xlsx",
+                file_name="UID_Studio_Sjabloon.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
@@ -546,15 +537,16 @@ with tab2:
             df = pd.read_excel(excel_bestand, dtype=str)
             df.columns = df.columns.str.strip().str.upper()
             
-            if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
+            if set(['NCAGE', 'OEM']).issubset(df.columns):
                 resultaten = []
                 zip_buffer = io.BytesIO()
+                heeft_mpn = 'MPN' in df.columns
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
                         ncage_raw = str(row['NCAGE']).strip().upper() if pd.notna(row['NCAGE']) else ""
-                        mpn_raw = str(row['MPN']).strip().upper() if pd.notna(row['MPN']) else ""
                         oem_raw = str(row['OEM']).strip().upper() if pd.notna(row['OEM']) else ""
+                        mpn_raw = str(row['MPN']).strip().upper() if (heeft_mpn and pd.notna(row['MPN'])) else ""
 
                         ncage_clean = "" if ncage_raw in ("NAN", "NONE") else ncage_raw
                         mpn_clean = "" if mpn_raw in ("NAN", "NONE") else mpn_raw
@@ -563,21 +555,14 @@ with tab2:
                         if not (ncage_clean or mpn_clean or oem_clean):
                             continue
 
-                        if not mpn_clean:
-                            resultaten.append({
-                                "NCAGE": ncage_clean,
-                                "MPN": "",
-                                "OEM": oem_clean,
-                                "Construct": "Construct 2",
-                                "UII": "",
-                                "Lengte": 0,
-                                "Status": "FOUT (MPN ontbreekt - Construct 2 verplicht)",
-                                "ISO 15434 Syntax": ""
-                            })
-                            continue
-
-                        uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
-                        syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
+                        if mpn_clean:
+                            construct_type = "Construct 2"
+                            uii = f"D{ncage_clean}{mpn_clean}{oem_clean}"
+                            syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
+                        else:
+                            construct_type = "Construct 1"
+                            uii = f"D{ncage_clean}{oem_clean}"
+                            syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]S{oem_clean}[RS][EOT]"
 
                         lengte_ok = len(uii) <= 50 and len(ncage_clean) == 5 and bool(oem_clean)
                         status = "OK" if lengte_ok else "FOUT (>50 tekens, NCAGE≠5 of OEM leeg)"
@@ -586,7 +571,7 @@ with tab2:
                             try:
                                 img, decode_ok = genereer_label_afbeelding(
                                     ncage_clean, mpn_clean, oem_clean, syntax_string,
-                                    stijl=batch_stijl, construct="Construct 2"
+                                    stijl=batch_stijl, construct=construct_type
                                 )
                                 img_bytes = io.BytesIO()
                                 img.save(img_bytes, format="PNG")
@@ -600,7 +585,7 @@ with tab2:
                             "NCAGE": ncage_clean,
                             "MPN": mpn_clean,
                             "OEM": oem_clean,
-                            "Construct": "Construct 2",
+                            "Construct": construct_type,
                             "UII": uii,
                             "Lengte": len(uii),
                             "Status": status,
@@ -619,7 +604,6 @@ with tab2:
                     st.markdown(f"""
                         <div class="badge-row">
                             <span class="badge">BATCH VERWERKING</span>
-                            <span class="badge">CONSTRUCT 2</span>
                             <span class="badge badge-ok">✓ {len(df_resultaten)} REGELS VERWERKT</span>
                         </div>
                     """, unsafe_allow_html=True)
@@ -635,7 +619,7 @@ with tab2:
                         st.download_button(
                             label="📥 Download Verwerkte Lijst (.xlsx)",
                             data=excel_output.getvalue(),
-                            file_name="DM&D_UID_Batch_Resultaten.xlsx",
+                            file_name="UID_Studio_Batch_Resultaten.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             type="primary",
                             use_container_width=True
@@ -644,20 +628,21 @@ with tab2:
                         st.download_button(
                             label="📦 Download Alle Labels (.zip)",
                             data=zip_buffer.getvalue(),
-                            file_name="DM&D_UID_Batch_Labels.zip",
+                            file_name="UID_Studio_Batch_Labels.zip",
                             mime="application/zip",
                             use_container_width=True
                         )
             else:
-                st.error("❌ Fout: Voor Construct 2 zijn de kolommen **NCAGE**, **MPN** en **OEM** verplicht. Gebruik het sjabloon rechtsboven.")
+                st.error("❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal **NCAGE** en **OEM**). Gebruik het sjabloon rechtsboven.")
 
-# 5. Footer (Naam / Eigenaarschap onderaan de pagina)
+# 5. Footer (Eigenaarschap & Disclaimer)
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #555; font-size: 13px;'>
-        <strong>Ontwikkeld door: Marco van Dijk</strong><br>
-        Projectleider AIT / UID | Directie Materieel &amp; Diensten (DM&amp;D) / CLAS
+        <strong>UID Studio</strong> — Ontwikkeld door <strong>Marco van Dijk</strong><br>
+        Onafhankelijke tool op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).<br>
+        <span style='font-size: 11px; color: #777;'>Disclaimer: De gebruiker blijft zelf verantwoordelijk voor de fysieke printkwaliteit en optische verificatie (ISO/IEC 15415).</span>
     </div>
     """, 
     unsafe_allow_html=True
