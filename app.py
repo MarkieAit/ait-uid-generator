@@ -38,7 +38,7 @@ st.markdown("""
     
     /* Verklein de lege ruimte boven- en onderaan het scherm */
     .block-container {
-        padding-top: 1rem;
+        padding-top: 2rem;
         padding-bottom: 0.5rem;
     }
 
