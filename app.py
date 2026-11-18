@@ -270,10 +270,13 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #F1F5F9;
         border-right: 1px solid #E2E8F0;
+    }header[data-testid="stHeader"] {
+        background: transparent;
     }
     .block-container {
         padding-top: 3rem;
         padding-bottom: 1rem;
+    }
     }
     .stButton > button,
     .stDownloadButton > button,
