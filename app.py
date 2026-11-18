@@ -1,3 +1,13 @@
+"""
+UID Studio™ — MIL-STD-130N & STANAG 2290 Generator & Validator
+Copyright (c) 2026 Marco van Dijk. Alle rechten voorbehouden.
+
+Onafhankelijke software ontwikkeld op basis van openbare standaarden
+(MIL-STD-130N, STANAG 2290, ISO/IEC 15434 Format 06).
+Zonder voorafgaande schriftelijke toestemming van de auteur mag deze
+broncode niet worden gekopieerd, verspreid of commercieel hergebruikt.
+"""
+
 import streamlit as st
 import pandas as pd
 import io
@@ -9,7 +19,7 @@ from pylibdmtx.pylibdmtx import encode, decode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
-st.set_page_config(page_title="UID Studio | MIL-STD-130 & STANAG 2290 Generator", layout="wide")
+st.set_page_config(page_title="UID Studio™ | MIL-STD-130 & STANAG 2290 Generator", layout="wide")
 
 # --- BEVEILIGING ---
 if "ingelogd" not in st.session_state:
@@ -19,7 +29,7 @@ if not st.session_state["ingelogd"]:
     st.markdown("""
         <div style="background-color: #152232; padding: 1.5rem 2rem; border-bottom: 4px solid #E17000; margin-bottom: 1.5rem;">
             <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290</span>
-            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">UID Studio — Generator &amp; Validator</h1>
+            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">UID Studio™ — Generator &amp; Validator</h1>
         </div>
     """, unsafe_allow_html=True)
     wachtwoord = st.text_input("Voer het toegangswachtwoord in:", type="password")
@@ -289,19 +299,19 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 
 # 3. Zijbalk (Product info)
 with st.sidebar:
-    st.header("UID Studio")
+    st.header("UID Studio™")
     st.write("Onafhankelijke tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).")
     st.info("📌 **Standaardkeuze:**\n- **Construct 2:** `CAGE + MPN + SN` (meest gebruikt in asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)")
     st.markdown("---")
-    st.caption("**UID Studio**")
-    st.caption("Versie: v2.4 (Independent Edition)")
-    st.caption("Auteur: Marco van Dijk")
+    st.caption("**UID Studio™**")
+    st.caption("Versie: v2.5 (Independent Edition)")
+    st.caption("© 2026 Marco van Dijk")
 
 # 4. Strakke donkere Header Banner
 st.markdown("""
     <div class="app-header">
         <span class="app-kicker">Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290</span>
-        <div class="app-title">UID Studio — Data Matrix Generator &amp; Validator</div>
+        <div class="app-title">UID Studio™ — Data Matrix Generator &amp; Validator</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -476,7 +486,7 @@ with tab1:
                 """, unsafe_allow_html=True)
                 st.info(
                     "👈 Vul links de gegevens in en klik op **Bereken UII & Genereer Label**.\n\n"
-                    "UID Studio berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
+                    "UID Studio™ berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
                 )
 
     # Sessie-historie onderaan Tab 1
@@ -648,14 +658,15 @@ with tab2:
                         )
             else:
                 st.error("❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal **NCAGE** en **OEM**). Gebruik het sjabloon rechtsboven.")
-# 5. Footer (Eigenaarschap & Disclaimer)
+
+# 5. Footer (Eigenaarschap, Copyright & Disclaimer)
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #555; font-size: 13px;'>
-        <strong>UID Studio</strong> — Ontwikkeld door <strong>Marco van Dijk</strong><br>
-        Onafhankelijke tool op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).<br>
-        <span style='font-size: 11px; color: #777;'>Disclaimer: De gebruiker blijft zelf verantwoordelijk voor de fysieke printkwaliteit en optische verificatie (ISO/IEC 15415).</span>
+        <strong>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong>Marco van Dijk</strong> — Alle rechten voorbehouden.<br>
+        Onafhankelijke software op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).<br>
+        <span style='font-size: 11px; color: #777;'>Disclaimer: Gebruik op eigen risico. De gebruiker blijft zelf verantwoordelijk voor de fysieke printkwaliteit en optische verificatie (ISO/IEC 15415).</span>
     </div>
     """, 
     unsafe_allow_html=True
