@@ -1,11 +1,10 @@
 """
 UID Studio™ — MIL-STD-130N & STANAG 2290 Generator & Validator
-Copyright (c) 2026 Marco van Dijk. Alle rechten voorbehouden.
+Copyright (c) 2026 Marco van Dijk. All rights reserved.
 
-Onafhankelijke software ontwikkeld op basis van openbare standaarden
+Independent software built on public standards
 (MIL-STD-130N, STANAG 2290, ISO/IEC 15434 Format 06).
-Zonder voorafgaande schriftelijke toestemming van de auteur mag deze
-broncode niet worden gekopieerd, verspreid of commercieel hergebruikt.
+Unauthorized copying, distribution, or commercial reuse is prohibited.
 """
 
 import streamlit as st
@@ -15,25 +14,26 @@ import json
 import re
 import html
 import zipfile
+from urllib.parse import quote
 from datetime import datetime, date
 from pylibdmtx.pylibdmtx import encode, decode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # ==========================================
-# LICENTIE- & DEMO-INSTELLINGEN (PAS HIER AAN)
+# LICENTIE- & CONTACTINSTELLINGEN
 # ==========================================
-VERLOOPDATUM = date(2026, 12, 31)   # Jaar, Maand, Dag
-MAX_DEMO_BATCH_REGELS = 5           # Maximaal aantal Excel-regels in proefversie
+VERLOOPDATUM = date(2026, 12, 31)     # ISO: YYYY-MM-DD
+MAX_DEMO_BATCH_REGELS = 5             # Max. Excel rows in trial
 CONTACT_NAAM = "Marco van Dijk"
-CONTACT_INFO = "7.spek_amp@icloud.com" # Vul hier je e-mailadres of telefoonnummer in
+CONTACT_EMAIL = "marco@voorbeeld.nl"  # Vul hier je zakelijke e-mailadres in
 # ==========================================
 
 # 1. Pagina configuratie (moet altijd als eerste Streamlit-commando staan)
-st.set_page_config(page_title="UID Studio™ | MIL-STD-130 & STANAG 2290 Generator", layout="wide")
+st.set_page_config(page_title="UID Studio™ | MIL-STD-130 & STANAG 2290", layout="wide")
 
-# Initialiseer taal en sessie-status
+# Initialiseer sessie-status
 if "taal" not in st.session_state:
-    st.session_state["taal"] = "🇳🇱 Nederlands"
+    st.session_state["taal"] = "NL"
 if "ingelogd" not in st.session_state:
     st.session_state["ingelogd"] = False
 if "historie" not in st.session_state:
@@ -44,18 +44,21 @@ if "historie" not in st.session_state:
 # ==========================================
 TEXT = {
     "NL": {
-        "expired_kicker": "UID Studio™ &nbsp;|&nbsp; Licentie Verlopen",
-        "expired_title": "Proefversie is afgelopen",
-        "expired_msg": "🔒 De proefperiode van **UID Studio™** is verlopen op **{datum}**.\n\nNeem contact op met **{naam}** ({contact}) om te kijken naar een passende oplossing of volledige licentie.",
-        "login_kicker": "Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290",
-        "login_title": "UID Studio™ — Generator &amp; Validator",
-        "login_prompt": "Voer het toegangswachtwoord in:",
-        "login_err": "❌ Onjuist wachtwoord. Toegang geweigerd.",
+        "expired_kicker": "UID Studio™ &nbsp;·&nbsp; Proefperiode Afgelopen",
+        "expired_title": "Uw proeflicentie is verlopen",
+        "expired_msg": "De proefperiode van UID Studio™ is verlopen op **{datum}**. Upgrade naar een volledige licentie voor onbeperkte batchverwerking, industriële exportformaten (SVG/PDF/ZPL) en maatwerk ERP-koppelingen.",
+        "upgrade_cta": "Vraag volledige licentie aan",
+        "upgrade_sub": "Onbeperkte Excel-batches · Geen verloopdatum · SVG / PDF / ZPL export",
+        "login_kicker": "Enterprise Compliance &nbsp;·&nbsp; MIL-STD-130N &amp; STANAG 2290",
+        "login_title": "UID Studio™",
+        "login_prompt": "Voer uw toegangscode in:",
+        "login_err": "❌ Onjuiste toegangscode. Toegang geweigerd.",
         "secret_err": "❌ Configuratiefout: Stel `app_wachtwoord` in via Streamlit Secrets.",
-        "sidebar_desc": "Onafhankelijke tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
-        "sidebar_std": "📌 **Standaardkeuze:**\n- **Construct 2:** `CAGE + MPN + SN` (meest gebruikt in asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)",
-        "sidebar_demo": "⏳ **Proefversie actief**\n- Geldig t/m: **{datum}** ({dagen} dagen)\n- Excel-batch: max. **{max_regels} regels** per upload",
-        "header_title": "UID Studio™ — Data Matrix Generator &amp; Validator",
+        "trust_badge": "🔒 100% In-Memory — Geen data opgeslagen",
+        "sidebar_desc": "Onafhankelijke B2B-tool voor het valideren en genereren van machine-leesbare MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
+        "sidebar_std": "📌 **UID Constructs:**\n- **Construct 2:** `CAGE + MPN + SN` (standaard voor asset management)\n- **Construct 1:** `CAGE + SN` (bij wereldwijd unieke serienummers)",
+        "sidebar_demo": "⏳ **Proeflicentie actief**\n- Geldig t/m: **{datum}** ({dagen} dagen)\n- Batch-limiet: max. **{max_regels} regels** per upload",
+        "header_title": "UID Studio™ — MIL-STD-130 Generator &amp; Validator",
         "tab_single": "🏷️ Enkel Label",
         "tab_batch": "📊 Batch Verwerking (Excel)",
         "sec_input": "1. Data Invoer",
@@ -67,46 +70,51 @@ TEXT = {
         "style_thermal": "Thermisch (Zwart op Wit)",
         "c2_info": "ℹ️ **Construct 2:** Unieke identificatie via `CAGE/NCAGE + MPN + Serienummer`.",
         "c1_info": "ℹ️ **Construct 1:** Unieke identificatie via `CAGE/NCAGE + Serienummer` (zonder MPN).",
-        "ncage_lbl": "CAGE / NCAGE-code (exact 5 karakters, bijv. A213N)",
-        "mpn_lbl": "MPN (max. 32 karakters, bijv. YS2R8X800)",
-        "sn_lbl": "Serienummer (max. 30 karakters, bijv. 05677484)",
+        "ncage_lbl": "CAGE / NCAGE-code (exact 5 tekens, bijv. A213N)",
+        "mpn_lbl": "MPN / Part Number (max. 32 tekens, bijv. YS2R8X800)",
+        "sn_lbl": "Serienummer / SN (max. 30 tekens, bijv. 05677484)",
         "len_err": "❌ UII-lengte overschreden: **{lengte} / 50 tekens** (MIL-STD-130 limiet).",
         "len_ok": "📏 Live UII-lengte: **{lengte} / 50 tekens** (MIL-STD-130 norm)",
         "warn_ncage": "⚠️ CAGE/NCAGE bevat spaties of ongeldige tekens.",
         "warn_mpn": "⚠️ MPN bevat spaties of ongeldige tekens.",
         "warn_sn": "⚠️ Serienummer bevat spaties of ongeldige tekens.",
-        "btn_gen": "Bereken UII & Genereer Label",
-        "btn_clear": "🔄 Wis velden",
+        "btn_gen": "Genereer UII & Label",
+        "btn_sample": "⚡ Voorbeeld",
+        "btn_clear": "🔄 Wis",
         "err_fix_warns": "❌ Corrigeer eerst de waarschuwingen in de invoervelden.",
-        "err_ncage_len": "❌ Fout: Een geldige CAGE/NCAGE-code moet exact 5 karakters lang zijn (bijv. A213N).",
-        "err_uii_len": "❌ Fout: De totale UII mag volgens MIL-STD-130 maximaal 50 karakters lang zijn.",
-        "warn_req": "⚠️ Vul alstublieft alle verplichte velden in om de UID te genereren.",
+        "err_ncage_len": "❌ Fout: Een geldige CAGE/NCAGE-code moet exact 5 tekens lang zijn.",
+        "err_uii_len": "❌ Fout: De totale UII mag volgens MIL-STD-130 maximaal 50 tekens lang zijn.",
+        "warn_req": "⚠️ Vul alle verplichte velden in om het label te genereren.",
         "badge_decode_ok": "✓ DECODE GEVALIDEERD",
         "badge_decode_fail": "⚠ DECODE CHECK MISLUKT",
-        "uii_calc": "**Berekende UII:** `{uii}`",
+        "uii_copy_lbl": "Berekende UII (klik rechts om te kopiëren):",
         "img_caption": "Gegenereerd Label ({stijl})",
-        "btn_dl_png": "🖨️ Download & Print Label (.png)",
-        "exp_syntax": "🔍 Toon Technische Syntax (ASCII / HEX & DI's)",
+        "btn_dl_png": "⬇️ Download Label (.png)",
+        "pro_export_lbl": "Industriële exportformaten (Pro):",
+        "pro_tooltip": "Beschikbaar in UID Studio™ Pro — neem contact op voor een licentie.",
+        "exp_syntax": "🔍 Technische Syntax (ASCII / HEX & DI's)",
         "di_title": "**Data Identifiers (Format 06):**",
         "di_sn": "Serienummer",
         "ascii_title": "**ASCII Structuur:**",
         "hex_title": "**Raw Data (HEX stuurtekens):**",
-        "exp_json": "Toon Machine-Readable JSON (Optioneel)",
+        "syntax_copy_lbl": "**ISO 15434 Syntax (kopieerbaar):**",
+        "exp_json": "Machine-Readable JSON",
         "err_barcode": "❌ Fout bij genereren barcode: {e}",
-        "empty_info": "👈 Vul links de gegevens in en klik op **Bereken UII & Genereer Label**.\n\nUID Studio™ berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label.",
+        "empty_info": "👈 Vul links de gegevens in of klik op **⚡ Voorbeeld** om direct een MIL-STD-130N label te testen.\n\nAlle verwerking gebeurt volledig in het geheugen (Zero Data Retention).",
         "hist_title": "🕒 Recente Labels (Deze Sessie)",
-        "btn_dl_again": "⬇️ Opnieuw (.png)",
+        "btn_dl_again": "⬇️ PNG",
         "batch_title": "Batch Verwerking via Excel",
-        "batch_info": "ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. Voeg optioneel **ERP_SLEUTEL** toe voor ERP-import. *(Proefversie: max. {max_regels} regels per upload)*",
-        "batch_desc": "Regels met een ingevulde **MPN** worden als **Construct 2** verwerkt; zonder MPN als **Construct 1**. Voorloopnullen blijven behouden.",
+        "batch_info": "ℹ️ Geaccepteerde kolommen: **CAGE** (of `NCAGE`), **SN** (of `SERIAL`/`OEM`), optioneel **MPN** (Construct 2) en optioneel **ERP_KEY** (of `ERP_SLEUTEL`/`ASSET_ID`). *(Proefversie: max. {max_regels} regels)*",
+        "batch_desc": "Regels met **MPN** worden als **Construct 2** verwerkt; zonder MPN als **Construct 1**. Voorloopnullen blijven altijd behouden.",
         "batch_style_lbl": "Stijl voor ZIP-labels",
         "btn_template": "📄 Excel-sjabloon",
-        "uploader_lbl": "Sleep je Excel-bestand hierheen of klik op bladeren",
+        "uploader_lbl": "Sleep uw Excel-bestand (.xlsx) hierheen of klik om te bladeren",
         "err_excel_read": "❌ Kon het Excel-bestand niet lezen. Controleer of het een geldig, onbeveiligd `.xlsx`-bestand is.",
-        "demo_limit_warn": "⚠️ **Proefversie-limiet bereikt:** Uw bestand bevat {totaal} gevulde regels. In deze demo worden de eerste **{max_regels} regels** verwerkt. Neem contact op met **{naam}** ({contact}) voor onbeperkte batchverwerking.",
+        "demo_limit_title": "Proefversie-limiet bereikt ({totaal} regels gevonden)",
+        "demo_limit_msg": "In deze proefversie worden de eerste **{max_regels} regels** verwerkt. Upgrade naar **UID Studio™ Pro** voor onbeperkte batchverwerking en directe ERP-integratie.",
         "status_ok": "OK",
         "status_err_chars": "FOUT (Ongeldige tekens/spaties)",
-        "status_err_limits": "FOUT (Veldlimiet: NCAGE=5, MPN≤32, SN≤30, UII≤50)",
+        "status_err_limits": "FOUT (Veldlimiet: CAGE=5, MPN≤32, SN≤30, UII≤50)",
         "status_warn_dec": "WAARSCHUWING (Decode check)",
         "status_err_bc": "FOUT (Barcode)",
         "dup_warn": "⚠️ **Duplicaat-detectie:** De volgende UII('s) komen vaker voor in dit bestand: `{dups}`",
@@ -115,75 +123,83 @@ TEXT = {
         "btn_dl_xlsx": "📥 Download Verwerkte Lijst (.xlsx)",
         "btn_dl_zip": "📦 Download Alle Labels (.zip)",
         "no_valid_zip": "ℹ️ Geen geldige labels gegenereerd om als ZIP te downloaden.",
-        "err_cols": "❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal **NCAGE** en **OEM**). Gebruik het sjabloon rechtsboven.",
+        "err_cols": "❌ Fout: Het bestand mist de verplichte kolommen (minimaal **CAGE/NCAGE** en **SN/SERIAL/OEM**). Gebruik het sjabloon rechtsboven.",
         "footer_rights": "Alle rechten voorbehouden.",
         "footer_sub": "Onafhankelijke software op basis van openbare standaarden (MIL-STD-130N / STANAG 2290 / ISO 15434).",
-        "footer_disc": "Disclaimer: Gebruik op eigen risico. De gebruiker blijft zelf verantwoordelijk voor de fysieke printkwaliteit en optische verificatie (ISO/IEC 15415)."
+        "footer_disc": "Disclaimer: Gebruik op eigen risico. De gebruiker blijft zelf verantwoordelijk voor fysieke printkwaliteit en optische verificatie (ISO/IEC 15415)."
     },
     "EN": {
-        "expired_kicker": "UID Studio™ &nbsp;|&nbsp; License Expired",
-        "expired_title": "Trial Version Has Ended",
-        "expired_msg": "🔒 The trial period of **UID Studio™** expired on **{datum}**.\n\nPlease contact **{naam}** ({contact}) to discuss a suitable solution or full license.",
-        "login_kicker": "Open Standards Tool &nbsp;|&nbsp; MIL-STD-130N &amp; STANAG 2290",
-        "login_title": "UID Studio™ — Generator &amp; Validator",
-        "login_prompt": "Enter access password:",
-        "login_err": "❌ Incorrect password. Access denied.",
+        "expired_kicker": "UID Studio™ &nbsp;·&nbsp; Trial Period Ended",
+        "expired_title": "Your trial license has expired",
+        "expired_msg": "The trial period for UID Studio™ ended on **{datum}**. Upgrade to a full license for unlimited batch processing, industrial export formats (SVG/PDF/ZPL), and custom ERP integration.",
+        "upgrade_cta": "Request Full License",
+        "upgrade_sub": "Unlimited Excel batches · No expiry date · SVG / PDF / ZPL export",
+        "login_kicker": "Enterprise Compliance &nbsp;·&nbsp; MIL-STD-130N &amp; STANAG 2290",
+        "login_title": "UID Studio™",
+        "login_prompt": "Enter your access code:",
+        "login_err": "❌ Incorrect access code. Access denied.",
         "secret_err": "❌ Configuration error: Set `app_wachtwoord` in Streamlit Secrets.",
-        "sidebar_desc": "Independent tool for validating and generating machine-readable MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
-        "sidebar_std": "📌 **Standard Selection:**\n- **Construct 2:** `CAGE + MPN + SN` (standard for asset management)\n- **Construct 1:** `CAGE + SN` (for globally unique serial numbers)",
-        "sidebar_demo": "⏳ **Trial Version Active**\n- Valid until: **{datum}** ({dagen} days)\n- Excel batch: max. **{max_regels} rows** per upload",
-        "header_title": "UID Studio™ — Data Matrix Generator &amp; Validator",
+        "trust_badge": "🔒 100% In-Memory — Zero Data Stored",
+        "sidebar_desc": "Independent B2B tool for validating and generating machine-readable MIL-STD-130N / STANAG 2290 Data Matrix codes (ISO/IEC 15434 Format 06).",
+        "sidebar_std": "📌 **UID Constructs:**\n- **Construct 2:** `CAGE + MPN + SN` (standard for asset management)\n- **Construct 1:** `CAGE + SN` (for globally unique serial numbers)",
+        "sidebar_demo": "⏳ **Trial License Active**\n- Valid until: **{datum}** ({dagen} days)\n- Batch limit: max. **{max_regels} rows** per upload",
+        "header_title": "UID Studio™ — MIL-STD-130 Generator &amp; Validator",
         "tab_single": "🏷️ Single Label",
         "tab_batch": "📊 Batch Processing (Excel)",
         "sec_input": "1. Data Input",
         "sec_output": "2. Output & Validation",
         "construct_lbl": "UID Construct",
-        "construct_help": "Choose Construct 2 (CAGE + MPN + SN) or Construct 1 (CAGE + SN).",
+        "construct_help": "Select Construct 2 (CAGE + MPN + SN) or Construct 1 (CAGE + SN).",
         "style_lbl": "Label Style",
         "style_laser": "Laser (White on Black)",
         "style_thermal": "Thermal (Black on White)",
         "c2_info": "ℹ️ **Construct 2:** Unique identification via `CAGE/NCAGE + MPN + Serial Number`.",
-        "c1_info": "ℹ️ **Construct 1:** Unique identification via `CAGE/NCAGE + Serial Number` (without MPN).",
-        "ncage_lbl": "CAGE / NCAGE Code (exact 5 characters, e.g. A213N)",
-        "mpn_lbl": "MPN (max. 32 characters, e.g. YS2R8X800)",
-        "sn_lbl": "Serial Number (max. 30 characters, e.g. 05677484)",
+        "c1_info": "ℹ️ **Construct 1:** Unique identification via `CAGE/NCAGE + Serial Number` (no MPN).",
+        "ncage_lbl": "CAGE / NCAGE Code (exact 5 chars, e.g. A213N)",
+        "mpn_lbl": "MPN / Part Number (max. 32 chars, e.g. YS2R8X800)",
+        "sn_lbl": "Serial Number / SN (max. 30 chars, e.g. 05677484)",
         "len_err": "❌ UII length exceeded: **{lengte} / 50 characters** (MIL-STD-130 limit).",
         "len_ok": "📏 Live UII length: **{lengte} / 50 characters** (MIL-STD-130 standard)",
         "warn_ncage": "⚠️ CAGE/NCAGE contains spaces or invalid characters.",
         "warn_mpn": "⚠️ MPN contains spaces or invalid characters.",
         "warn_sn": "⚠️ Serial number contains spaces or invalid characters.",
-        "btn_gen": "Calculate UII & Generate Label",
-        "btn_clear": "🔄 Clear fields",
+        "btn_gen": "Generate UII & Label",
+        "btn_sample": "⚡ Sample",
+        "btn_clear": "🔄 Clear",
         "err_fix_warns": "❌ Please resolve the warnings in the input fields first.",
-        "err_ncage_len": "❌ Error: A valid CAGE/NCAGE code must be exactly 5 characters long (e.g. A213N).",
+        "err_ncage_len": "❌ Error: A valid CAGE/NCAGE code must be exactly 5 characters long.",
         "err_uii_len": "❌ Error: Total UII length cannot exceed 50 characters per MIL-STD-130.",
-        "warn_req": "⚠️ Please fill in all required fields to generate the UID.",
+        "warn_req": "⚠️ Please fill in all required fields to generate the label.",
         "badge_decode_ok": "✓ DECODE VERIFIED",
         "badge_decode_fail": "⚠ DECODE CHECK FAILED",
-        "uii_calc": "**Calculated UII:** `{uii}`",
+        "uii_copy_lbl": "Calculated UII (click icon on the right to copy):",
         "img_caption": "Generated Label ({stijl})",
-        "btn_dl_png": "🖨️ Download & Print Label (.png)",
-        "exp_syntax": "🔍 Show Technical Syntax (ASCII / HEX & DIs)",
+        "btn_dl_png": "⬇️ Download Label (.png)",
+        "pro_export_lbl": "Industrial export formats (Pro):",
+        "pro_tooltip": "Available in UID Studio™ Pro — contact us for a license.",
+        "exp_syntax": "🔍 Technical Syntax (ASCII / HEX & DIs)",
         "di_title": "**Data Identifiers (Format 06):**",
         "di_sn": "Serial Number",
         "ascii_title": "**ASCII Structure:**",
         "hex_title": "**Raw Data (HEX control characters):**",
-        "exp_json": "Show Machine-Readable JSON (Optional)",
+        "syntax_copy_lbl": "**ISO 15434 Syntax (copyable):**",
+        "exp_json": "Machine-Readable JSON",
         "err_barcode": "❌ Error generating barcode: {e}",
-        "empty_info": "👈 Enter the details on the left and click **Calculate UII & Generate Label**.\n\nUID Studio™ calculates the UII, automatically runs a **decode self-check**, and delivers a print-ready label.",
+        "empty_info": "👈 Enter your asset data on the left or click **⚡ Sample** to test a MIL-STD-130N label right away.\n\nAll processing runs strictly in-memory (Zero Data Retention).",
         "hist_title": "🕒 Recent Labels (This Session)",
-        "btn_dl_again": "⬇️ Download (.png)",
+        "btn_dl_again": "⬇️ PNG",
         "batch_title": "Batch Processing via Excel",
-        "batch_info": "ℹ️ Upload an Excel file with **NCAGE**, **MPN** (optional for Construct 1), and **OEM**. Optionally add **ERP_SLEUTEL** for ERP import. *(Trial version: max. {max_regels} rows per upload)*",
-        "batch_desc": "Rows with an **MPN** are processed as **Construct 2**; without MPN as **Construct 1**. Leading zeros are preserved.",
+        "batch_info": "ℹ️ Accepted columns: **CAGE** (or `NCAGE`), **SN** (or `SERIAL`/`OEM`), optional **MPN** (Construct 2), and optional **ERP_KEY** (or `ASSET_ID`/`ERP_SLEUTEL`). *(Trial: max. {max_regels} rows)*",
+        "batch_desc": "Rows with **MPN** are processed as **Construct 2**; without MPN as **Construct 1**. Leading zeros are always preserved.",
         "batch_style_lbl": "Style for ZIP labels",
         "btn_template": "📄 Excel Template",
-        "uploader_lbl": "Drag and drop your Excel file here or click to browse",
+        "uploader_lbl": "Drag and drop your Excel file (.xlsx) here or click to browse",
         "err_excel_read": "❌ Could not read the Excel file. Please verify it is a valid, unprotected `.xlsx` file.",
-        "demo_limit_warn": "⚠️ **Trial limit reached:** Your file contains {totaal} non-empty rows. In this demo, only the first **{max_regels} rows** are processed. Contact **{naam}** ({contact}) for unlimited batch processing.",
+        "demo_limit_title": "Trial limit reached ({totaal} rows found)",
+        "demo_limit_msg": "In this trial version, only the first **{max_regels} rows** are processed. Upgrade to **UID Studio™ Pro** for unlimited batch processing and direct ERP integration.",
         "status_ok": "OK",
         "status_err_chars": "ERROR (Invalid characters/spaces)",
-        "status_err_limits": "ERROR (Field limits: NCAGE=5, MPN≤32, SN≤30, UII≤50)",
+        "status_err_limits": "ERROR (Field limits: CAGE=5, MPN≤32, SN≤30, UII≤50)",
         "status_warn_dec": "WARNING (Decode check)",
         "status_err_bc": "ERROR (Barcode)",
         "dup_warn": "⚠️ **Duplicate detection:** The following UII(s) appear multiple times in this file: `{dups}`",
@@ -192,15 +208,12 @@ TEXT = {
         "btn_dl_xlsx": "📥 Download Processed List (.xlsx)",
         "btn_dl_zip": "📦 Download All Labels (.zip)",
         "no_valid_zip": "ℹ️ No valid labels were generated for ZIP download.",
-        "err_cols": "❌ Error: The uploaded Excel file is missing required columns (at least **NCAGE** and **OEM**). Use the template above.",
+        "err_cols": "❌ Error: The uploaded file is missing required columns (at least **CAGE/NCAGE** and **SN/SERIAL/OEM**). Use the template above.",
         "footer_rights": "All rights reserved.",
-        "footer_sub": "Independent software based on open standards (MIL-STD-130N / STANAG 2290 / ISO 15434).",
+        "footer_sub": "Independent software built on public standards (MIL-STD-130N / STANAG 2290 / ISO 15434).",
         "footer_disc": "Disclaimer: Use at your own risk. The user remains responsible for physical print quality and optical verification (ISO/IEC 15415)."
     }
 }
-
-def get_lang_code():
-    return "EN" if "English" in st.session_state["taal"] else "NL"
 
 def get_app_password():
     """Haalt veilig het wachtwoord op uit Streamlit Secrets (met fallback voor migratie)."""
@@ -213,40 +226,269 @@ def get_app_password():
         pass
     return None
 
-# Taalschakelaar tonen op inlog- of verlopen-scherm (als nog niet ingelogd)
+def render_upgrade_card(title, body, cta_label, sub_text):
+    """Toont een commerciële B2B upgrade-kaart met directe mailto-knop."""
+    subject = quote("UID Studio Pro License Inquiry")
+    mailto_link = f"mailto:{CONTACT_EMAIL}?subject={subject}"
+    st.markdown(f"""
+        <div class="upgrade-card">
+            <div class="upgrade-content">
+                <div class="upgrade-title">🚀 {html.escape(title)}</div>
+                <div class="upgrade-body">{body}</div>
+                <div class="upgrade-sub">{html.escape(sub_text)}</div>
+            </div>
+            <a href="{mailto_link}" class="upgrade-btn">{html.escape(cta_label)} →</a>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 2. Moderne B2B SaaS Styling (CSS Injectie + Subtiel Watermerk)
+st.markdown("""
+<style>
+    [data-testid="stToolbar"] { visibility: hidden; }
+    .stApp {
+        background-color: #F8FAFC;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%230F172A' fill-opacity='0.035' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
+        background-repeat: repeat;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #F1F5F9;
+        border-right: 1px solid #E2E8F0;
+    }
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 1rem;
+    }
+    .stButton > button,
+    .stDownloadButton > button,
+    .stTextInput > div > div > input,
+    [data-testid="stFileUploader"] section {
+        border-radius: 6px !important;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 1.25rem !important;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    }
+    .stButton > button[kind="primary"],
+    .stDownloadButton > button[kind="primary"] {
+        background-color: #2563EB;
+        border-color: #2563EB;
+        color: #FFFFFF;
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stDownloadButton > button[kind="primary"]:hover {
+        background-color: #1D4ED8;
+        border-color: #1D4ED8;
+        color: #FFFFFF;
+    }
+    .stButton > button, .stDownloadButton > button {
+        min-height: 2.7rem;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 2px solid #E2E8F0;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px 6px 0 0;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        color: #475569;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        border-bottom: 3px solid #2563EB !important;
+    }
+    .app-header {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        padding: 1.3rem 1.8rem;
+        border-bottom: 3px solid #2563EB;
+        margin-bottom: 1.2rem;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .app-kicker {
+        color: #60A5FA;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .app-title {
+        color: #FFFFFF;
+        font-size: 1.65rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+    }
+    .trust-pill {
+        background-color: rgba(16, 185, 129, 0.14);
+        color: #6EE7B7;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 0.8rem;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 9px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border-radius: 4px;
+        background-color: #EFF6FF;
+        color: #1E40AF;
+        border: 1px solid #BFDBFE;
+    }
+    .badge-ok {
+        background-color: #ECFDF5;
+        color: #065F46;
+        border: 1px solid #A7F3D0;
+    }
+    .badge-warn {
+        background-color: #FFFBEB;
+        color: #92400E;
+        border: 1px solid #FDE68A;
+    }
+    .upgrade-card {
+        background-color: #F8FAFC;
+        border: 1px solid #CBD5E1;
+        border-left: 4px solid #2563EB;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin: 0.8rem 0 1rem 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 14px;
+    }
+    .upgrade-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0F172A;
+        margin-bottom: 4px;
+    }
+    .upgrade-body {
+        font-size: 13.5px;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+    .upgrade-sub {
+        font-size: 12px;
+        color: #64748B;
+        font-weight: 500;
+    }
+    .upgrade-btn {
+        background-color: #2563EB;
+        color: #FFFFFF !important;
+        text-decoration: none !important;
+        padding: 9px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .upgrade-btn:hover {
+        background-color: #1D4ED8;
+    }
+    .syntax-box {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.8;
+        word-break: break-all;
+        margin-bottom: 8px;
+    }
+    .tok-hdr { background-color: #E2E8F0; color: #0F172A; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+    .tok-ctrl { background-color: #FEE2E2; color: #991B1B; padding: 2px 4px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+    .tok-17v { background-color: #DBEAFE; color: #1E40AF; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+    .tok-1p { background-color: #F3E8FF; color: #6B21A8; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+    .tok-s { background-color: #DCFCE7; color: #166534; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+    .di-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+    hr {
+        margin-top: 0.7rem !important;
+        margin-bottom: 0.7rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Taalschakelaar op inlog- of verlopen-scherm (neutraal zonder vlaggen)
 vandaag = date.today()
+iso_verloop = VERLOOPDATUM.strftime("%Y-%m-%d")
+
 if vandaag > VERLOOPDATUM or not st.session_state["ingelogd"]:
-    _, lang_col = st.columns([5, 1.5])
+    _, lang_col = st.columns([5.5, 1.2])
     with lang_col:
         st.radio(
-            "Language",
-            ["🇳🇱 Nederlands", "🇬🇧 English"],
+            "🌐 Language",
+            ["NL", "EN"],
             horizontal=True,
             key="taal",
+            format_func=lambda x: f"🌐 {x}",
             label_visibility="collapsed"
         )
 
-lang = get_lang_code()
+lang = st.session_state["taal"]
 T = TEXT[lang]
 
 # --- CONTROLE VERLOOPDATUM ---
 if vandaag > VERLOOPDATUM:
     st.markdown(f"""
-        <div style="background-color: #152232; padding: 1.5rem 2rem; border-bottom: 4px solid #E17000; margin-bottom: 1.5rem;">
-            <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">{T['expired_kicker']}</span>
-            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">{T['expired_title']}</h1>
+        <div class="app-header">
+            <div>
+                <span class="app-kicker">{T['expired_kicker']}</span>
+                <div class="app-title">{T['expired_title']}</div>
+            </div>
+            <div class="trust-pill">{T['trust_badge']}</div>
         </div>
     """, unsafe_allow_html=True)
-    st.error(T["expired_msg"].format(datum=VERLOOPDATUM.strftime('%d-%m-%Y'), naam=CONTACT_NAAM, contact=CONTACT_INFO))
+    render_upgrade_card(
+        title=T["expired_title"],
+        body=T["expired_msg"].format(datum=iso_verloop).replace("**", ""),
+        cta_label=T["upgrade_cta"],
+        sub_text=T["upgrade_sub"]
+    )
     st.stop()
 # --- EINDE CONTROLE VERLOOPDATUM ---
 
 # --- BEVEILIGING ---
 if not st.session_state["ingelogd"]:
     st.markdown(f"""
-        <div style="background-color: #152232; padding: 1.5rem 2rem; border-bottom: 4px solid #E17000; margin-bottom: 1.5rem;">
-            <span style="color: #E17000; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">{T['login_kicker']}</span>
-            <h1 style="color: #FFFFFF; margin: 0.2rem 0 0 0; font-size: 1.8rem;">{T['login_title']}</h1>
+        <div class="app-header">
+            <div>
+                <span class="app-kicker">{T['login_kicker']}</span>
+                <div class="app-title">{T['login_title']}</div>
+            </div>
+            <div class="trust-pill">{T['trust_badge']}</div>
         </div>
     """, unsafe_allow_html=True)
     juiste_wachtwoord = get_app_password()
@@ -264,157 +506,26 @@ if not st.session_state["ingelogd"]:
         st.stop()
 # --- EINDE BEVEILIGING ---
 
-# 2. Styling (CSS Injectie + Subtiel Achtergrond-watermerk)
-st.markdown("""
-<style>
-    [data-testid="stToolbar"] { visibility: hidden; }
-    .stApp {
-        background-color: #EEF0F3;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' transform='rotate(-25 160 110)' fill='%23152232' fill-opacity='0.045' font-family='sans-serif' font-size='22' font-weight='700' letter-spacing='3'%3EUID STUDIO%E2%84%A2%3C/text%3E%3C/svg%3E");
-        background-repeat: repeat;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #E2E5E9;
-        border-right: 1px solid #CFD4DC;
-    }
-    .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 0.8rem;
-    }
-    .stButton > button,
-    .stDownloadButton > button,
-    .stTextInput > div > div > input,
-    [data-testid="stFileUploader"] section {
-        border-radius: 2px !important;
-    }
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FFFFFF;
-        border: 1px solid #D3D8DF !important;
-        border-radius: 2px !important;
-        padding: 1.25rem !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-    .stButton > button[kind="primary"],
-    .stDownloadButton > button[kind="primary"] {
-        background-color: #154273;
-        border-color: #154273;
-        color: #FFFFFF;
-    }
-    .stButton > button[kind="primary"]:hover,
-    .stDownloadButton > button[kind="primary"]:hover {
-        background-color: #0E2E52;
-        border-color: #0E2E52;
-        color: #FFFFFF;
-    }
-    .stButton > button, .stDownloadButton > button {
-        min-height: 2.8rem;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        border-bottom: 2px solid #D3D8DF;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 2px 2px 0 0;
-        padding: 0.6rem 1.2rem;
-        font-weight: 600;
-        color: #333F4D;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF !important;
-        color: #154273 !important;
-        border-bottom: 3px solid #E17000 !important;
-    }
-    .app-header {
-        background-color: #152232;
-        padding: 1.2rem 1.8rem;
-        border-bottom: 4px solid #E17000;
-        margin-bottom: 1.2rem;
-        border-radius: 2px;
-    }
-    .app-kicker {
-        color: #E17000;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: 0.25rem;
-    }
-    .app-title {
-        color: #FFFFFF;
-        font-size: 1.75rem;
-        font-weight: 700;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .badge-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 0.8rem;
-    }
-    .badge {
-        display: inline-block;
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.6px;
-        text-transform: uppercase;
-        border-radius: 2px;
-        background-color: #E8EEF5;
-        color: #154273;
-        border: 1px solid #C5D4E6;
-    }
-    .badge-ok {
-        background-color: #E4F3EA;
-        color: #1B5E20;
-        border: 1px solid #B7DFC5;
-    }
-    .badge-warn {
-        background-color: #FFF4E5;
-        color: #B25E00;
-        border: 1px solid #FFD8A8;
-    }
-    .syntax-box {
-        background-color: #F4F6F8;
-        border: 1px solid #D3D8DF;
-        border-radius: 2px;
-        padding: 10px 12px;
-        font-family: monospace;
-        font-size: 13px;
-        line-height: 1.8;
-        word-break: break-all;
-        margin-bottom: 8px;
-    }
-    .tok-hdr { background-color: #E2E8F0; color: #1E293B; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
-    .tok-ctrl { background-color: #FEE2E2; color: #991B1B; padding: 2px 4px; border-radius: 2px; font-size: 11px; font-weight: 700; }
-    .tok-17v { background-color: #DBEAFE; color: #1E40AF; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
-    .tok-1p { background-color: #F3E8FF; color: #6B21A8; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
-    .tok-s { background-color: #DCFCE7; color: #166534; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
-    .di-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 6px;
-        font-size: 13px;
-    }
-    hr {
-        margin-top: 0.6rem !important;
-        margin-bottom: 0.6rem !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # --- HULPFUNCTIES ---
 def wis_velden():
     st.session_state["ncage_input"] = ""
     st.session_state["mpn_input"] = ""
     st.session_state["oem_input"] = ""
 
+def vul_voorbeelddata():
+    st.session_state["ncage_input"] = "A213N"
+    st.session_state["mpn_input"] = "YS2R8X800"
+    st.session_state["oem_input"] = "05677484"
+
 def bevat_ongeldige_tekens(tekst):
     return bool(re.search(r'[^A-Za-z0-9\-/]', tekst))
+
+def vind_kolom(kolommen, aliassen):
+    """Zoekt de eerste passende kolomnaam uit een lijst van internationale aliassen."""
+    for alias in aliassen:
+        if alias in kolommen:
+            return alias
+    return None
 
 def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, sn_label, construct="Construct 2"):
     """Bouwt een kleurgecodeerde ASCII en HEX weergave met HTML-escaping tegen XSS."""
@@ -512,14 +623,13 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 
     draw = ImageDraw.Draw(label_img)
     if not is_laser:
-        draw.rectangle([(0, 0), (749, 349)], outline="#CCCCCC", width=2)
+        draw.rectangle([(0, 0), (749, 349)], outline="#CBD5E1", width=2)
 
     regels = [f"CAGE:  {ncage_clean}"]
     if construct == "Construct 2" and mpn_clean:
         regels.append(f"MPN:   {mpn_clean}")
     regels.append(f"SN:    {oem_clean}")
 
-    # Beschikbare breedte links van de barcode minus ruime Quiet Zone (45px links + 30px marge voor barcode)
     max_tekst_breedte = max(200, x_pos_barcode - 75)
     font = laad_passend_font(draw, regels, max_breedte_px=max_tekst_breedte)
 
@@ -530,34 +640,39 @@ def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, 
 
     return label_img, decode_ok
 
-# 3. Zijbalk (Taalschakelaar, Product info & Licentiestatus)
+# 3. Zijbalk (Neutrale Taalschakelaar, Product info, Trust & Licentiestatus)
 dagen_over = (VERLOOPDATUM - vandaag).days
 with st.sidebar:
     st.radio(
-        "Taal / Language",
-        ["🇳🇱 Nederlands", "🇬🇧 English"],
+        "🌐 Language / Taal",
+        ["NL", "EN"],
         horizontal=True,
         key="taal",
+        format_func=lambda x: f"🌐 {x}",
         label_visibility="collapsed"
     )
-    lang = get_lang_code()
+    lang = st.session_state["taal"]
     T = TEXT[lang]
 
     st.markdown("---")
     st.header("UID Studio™")
     st.write(T["sidebar_desc"])
+    st.success(T["trust_badge"])
     st.info(T["sidebar_std"])
-    st.warning(T["sidebar_demo"].format(datum=VERLOOPDATUM.strftime('%d-%m-%Y'), dagen=dagen_over, max_regels=MAX_DEMO_BATCH_REGELS))
+    st.warning(T["sidebar_demo"].format(datum=iso_verloop, dagen=dagen_over, max_regels=MAX_DEMO_BATCH_REGELS))
     st.markdown("---")
     st.caption("**UID Studio™**")
-    st.caption("Version: v2.8 (QA Hardened)")
+    st.caption("Version: v3.0 (B2B International)")
     st.caption(f"© 2026 {CONTACT_NAAM}")
 
-# 4. Strakke donkere Header Banner
+# 4. Moderne B2B Header Banner met Zero Data Retention Trust Badge
 st.markdown(f"""
     <div class="app-header">
-        <span class="app-kicker">{T['login_kicker']}</span>
-        <div class="app-title">{T['header_title']}</div>
+        <div>
+            <span class="app-kicker">{T['login_kicker']}</span>
+            <div class="app-title">{T['header_title']}</div>
+        </div>
+        <div class="trust-pill">{T['trust_badge']}</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -586,10 +701,7 @@ with tab1:
                 label_stijl = st.radio(T["style_lbl"], stijl_opties, horizontal=True)
                 is_laser_single = (label_stijl == T["style_laser"])
 
-            if construct_keuze == "Construct 2":
-                st.caption(T["c2_info"])
-            else:
-                st.caption(T["c1_info"])
+            st.caption(T["c2_info"] if construct_keuze == "Construct 2" else T["c1_info"])
 
             ncage = st.text_input(T["ncage_lbl"], max_chars=5, key="ncage_input")
             
@@ -617,10 +729,12 @@ with tab1:
                 st.warning(T["warn_sn"])
                 invoer_fout = True
 
-            btn_col1, btn_col2 = st.columns([2, 1])
+            btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 0.9])
             with btn_col1:
                 generate_btn = st.button(T["btn_gen"], type="primary", use_container_width=True)
             with btn_col2:
+                st.button(T["btn_sample"], on_click=vul_voorbeelddata, use_container_width=True)
+            with btn_col3:
                 st.button(T["btn_clear"], on_click=wis_velden, use_container_width=True)
 
     with col2:
@@ -681,7 +795,10 @@ with tab1:
                                 </div>
                             """, unsafe_allow_html=True)
 
-                            st.success(T["uii_calc"].format(uii=uii))
+                            # Eén-klik kopiëren voor de berekende UII
+                            st.caption(T["uii_copy_lbl"])
+                            st.code(uii, language=None)
+
                             st.image(label_img, caption=T["img_caption"].format(stijl=label_stijl), width=460)
                             
                             st.download_button(
@@ -693,6 +810,16 @@ with tab1:
                                 use_container_width=True
                             )
 
+                            # Industriële Pro-exportformaten (Roadmap / Conversie)
+                            st.caption(T["pro_export_lbl"])
+                            pro_c1, pro_c2, pro_c3 = st.columns(3)
+                            with pro_c1:
+                                st.button("SVG (Vector) 🔒", disabled=True, help=T["pro_tooltip"], use_container_width=True)
+                            with pro_c2:
+                                st.button("PDF (Print) 🔒", disabled=True, help=T["pro_tooltip"], use_container_width=True)
+                            with pro_c3:
+                                st.button("ZPL (Zebra) 🔒", disabled=True, help=T["pro_tooltip"], use_container_width=True)
+
                             ascii_html, hex_str, di_html = bouw_kleur_syntax_html(
                                 ncage_clean, mpn_clean, oem_clean, sn_label=T["di_sn"], construct=construct_keuze
                             )
@@ -703,13 +830,15 @@ with tab1:
                                 st.markdown(f'<div class="syntax-box">{ascii_html}</div>', unsafe_allow_html=True)
                                 st.markdown(T["hex_title"])
                                 st.markdown(f'<div class="syntax-box">{hex_str}</div>', unsafe_allow_html=True)
+                                st.markdown(T["syntax_copy_lbl"])
+                                st.code(syntax_string, language=None)
 
                             output_data = {
                                 "uii": uii,
                                 "construct": construct_keuze,
-                                "ncage": ncage_clean,
+                                "cage": ncage_clean,
                                 "mpn": mpn_clean if construct_keuze == "Construct 2" else None,
-                                "oem_serial": oem_clean,
+                                "serial_number": oem_clean,
                                 "iso_15434_syntax": syntax_string,
                                 "decode_verified": decode_ok
                             }
@@ -735,7 +864,7 @@ with tab1:
         with st.container(border=True):
             st.subheader(T["hist_title"])
             for idx, item in enumerate(st.session_state["historie"]):
-                h_col1, h_col2, h_col3 = st.columns([3, 2, 1.5])
+                h_col1, h_col2, h_col3 = st.columns([3, 2.2, 1.2])
                 with h_col1:
                     st.markdown(f"**`{item['uii']}`**")
                 with h_col2:
@@ -758,11 +887,12 @@ with tab2:
         st.subheader(T["batch_title"])
         st.info(T["batch_info"].format(max_regels=MAX_DEMO_BATCH_REGELS))
         
+        # Internationaal sjabloon (met ondersteuning voor NL aliassen bij upload)
         sjabloon_df = pd.DataFrame({
-            "ERP_SLEUTEL": ["10004582"],
-            "NCAGE": ["A213N"],
+            "ERP_KEY": ["10004582"],
+            "CAGE": ["A213N"],
             "MPN": ["YS2R8X800"],
-            "OEM": ["05677484"]
+            "SN": ["05677484"]
         })
         sjabloon_buffer = io.BytesIO()
         with pd.ExcelWriter(sjabloon_buffer, engine='openpyxl') as writer:
@@ -793,35 +923,39 @@ with tab2:
                 st.stop()
 
             df.columns = df.columns.str.strip().str.upper()
+
+            # Internationale & Nederlandse kolom-aliassen automatisch herkennen
+            col_cage = vind_kolom(df.columns, ["CAGE", "NCAGE", "CAGE_CODE", "NCAGE_CODE"])
+            col_sn = vind_kolom(df.columns, ["SN", "SERIAL", "SERIAL_NUMBER", "SERIENUMMER", "OEM"])
+            col_mpn = vind_kolom(df.columns, ["MPN", "PART_NUMBER", "PART_NO", "PN", "P/N"])
+            col_key = vind_kolom(df.columns, ["ERP_KEY", "ERP_SLEUTEL", "ASSET_ID", "EQUIPMENT_ID", "KEY"])
             
-            if set(['NCAGE', 'OEM']).issubset(df.columns):
-                # Verwijder eerst volledig lege (of spatie-) rijen vóór de demo-limiet
+            if col_cage and col_sn:
+                # Verwijder volledig lege rijen vóór de demo-limiet
                 df = df.replace(r'^\s*$', pd.NA, regex=True).dropna(how="all")
 
                 totaal_regels = len(df)
                 if totaal_regels > MAX_DEMO_BATCH_REGELS:
-                    st.warning(T["demo_limit_warn"].format(
-                        totaal=totaal_regels,
-                        max_regels=MAX_DEMO_BATCH_REGELS,
-                        naam=CONTACT_NAAM,
-                        contact=CONTACT_INFO
-                    ))
+                    render_upgrade_card(
+                        title=T["demo_limit_title"].format(totaal=totaal_regels),
+                        body=T["demo_limit_msg"].format(max_regels=MAX_DEMO_BATCH_REGELS).replace("**", ""),
+                        cta_label=T["upgrade_cta"],
+                        sub_text=T["upgrade_sub"]
+                    )
                     df = df.head(MAX_DEMO_BATCH_REGELS)
 
                 resultaten = []
                 zip_buffer = io.BytesIO()
                 geldige_labels_count = 0
-                heeft_mpn = 'MPN' in df.columns
-                heeft_sleutel = 'ERP_SLEUTEL' in df.columns
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
-                        sleutel_raw = str(row['ERP_SLEUTEL']).strip() if (heeft_sleutel and pd.notna(row['ERP_SLEUTEL'])) else ""
+                        sleutel_raw = str(row[col_key]).strip() if (col_key and pd.notna(row[col_key])) else ""
                         sleutel_clean = "" if sleutel_raw.upper() in ("NAN", "NONE") else sleutel_raw
 
-                        ncage_raw = str(row['NCAGE']).strip().upper() if pd.notna(row['NCAGE']) else ""
-                        oem_raw = str(row['OEM']).strip().upper() if pd.notna(row['OEM']) else ""
-                        mpn_raw = str(row['MPN']).strip().upper() if (heeft_mpn and pd.notna(row['MPN'])) else ""
+                        ncage_raw = str(row[col_cage]).strip().upper() if pd.notna(row[col_cage]) else ""
+                        oem_raw = str(row[col_sn]).strip().upper() if pd.notna(row[col_sn]) else ""
+                        mpn_raw = str(row[col_mpn]).strip().upper() if (col_mpn and pd.notna(row[col_mpn])) else ""
 
                         ncage_clean = "" if ncage_raw in ("NAN", "NONE") else ncage_raw
                         mpn_clean = "" if mpn_raw in ("NAN", "NONE") else mpn_raw
@@ -839,7 +973,6 @@ with tab2:
                             uii = f"D{ncage_clean}{oem_clean}"
                             syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]S{oem_clean}[RS][EOT]"
 
-                        # Strenge MIL-STD-130 karakter- en veldlimietvalidatie
                         tekens_ok = not (
                             bevat_ongeldige_tekens(ncage_clean)
                             or (mpn_clean and bevat_ongeldige_tekens(mpn_clean))
@@ -873,13 +1006,13 @@ with tab2:
                                 status = T["status_err_bc"]
 
                         rij_resultaat = {}
-                        if heeft_sleutel:
-                            rij_resultaat["ERP_SLEUTEL"] = sleutel_clean
+                        if col_key:
+                            rij_resultaat[col_key] = sleutel_clean
 
                         rij_resultaat.update({
-                            "NCAGE": ncage_clean,
+                            "CAGE": ncage_clean,
                             "MPN": mpn_clean,
-                            "OEM": oem_clean,
+                            "SN": oem_clean,
                             "Construct": construct_type,
                             "UII": uii if (tekens_ok and limieten_ok) else "",
                             "Length" if lang == "EN" else "Lengte": len(uii) if (tekens_ok and limieten_ok) else 0,
@@ -938,10 +1071,10 @@ with tab2:
 st.markdown("---")
 st.markdown(
     f"""
-    <div style='text-align: center; color: #555; font-size: 13px;'>
-        <strong>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong>{CONTACT_NAAM}</strong> — {T['footer_rights']}<br>
+    <div style='text-align: center; color: #64748B; font-size: 13px;'>
+        <strong style='color: #0F172A;'>UID Studio™</strong> &nbsp;|&nbsp; &copy; 2026 <strong style='color: #0F172A;'>{CONTACT_NAAM}</strong> — {T['footer_rights']}<br>
         {T['footer_sub']}<br>
-        <span style='font-size: 11px; color: #777;'>{T['footer_disc']}</span>
+        <span style='font-size: 11px; color: #94A3B8;'>{T['footer_disc']}</span>
     </div>
     """, 
     unsafe_allow_html=True
