@@ -505,9 +505,13 @@ with tab1:
 with tab2:
     with st.container(border=True):
         st.subheader("Batch Verwerking via Excel")
-        st.info("ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. Voorloopnullen in serienummers blijven automatisch behouden.")
+        st.info(
+            "ℹ️ Upload een Excel-bestand met **NCAGE**, **MPN** (optioneel voor Construct 1) en **OEM**. "
+            "Voeg optioneel de kolom **ERP_SLEUTEL** toe (bijv. SAP Equipment-nummer) om de output direct terug te kunnen laden in je ERP-systeem."
+        )
         
         sjabloon_df = pd.DataFrame({
+            "ERP_SLEUTEL": ["10004582"],
             "NCAGE": ["A213N"],
             "MPN": ["YS2R8X800"],
             "OEM": ["05677484"]
@@ -518,7 +522,7 @@ with tab2:
         
         col_info, col_stijl, col_sjabloon = st.columns([2.5, 1.5, 1.2])
         with col_info:
-            st.write("Regels met een ingevulde **MPN** worden als **Construct 2** verwerkt; zonder MPN als **Construct 1**.")
+            st.write("Regels met een ingevulde **MPN** worden als **Construct 2** verwerkt; zonder MPN als **Construct 1**. Voorloopnullen blijven behouden.")
         with col_stijl:
             batch_stijl = st.selectbox("Stijl voor ZIP-labels", ["Laser (Wit op Zwart)", "Thermisch (Zwart op Wit)"])
         with col_sjabloon:
@@ -533,7 +537,7 @@ with tab2:
         excel_bestand = st.file_uploader("Sleep je Excel-bestand hierheen of klik op bladeren", type=["xlsx"])
 
         if excel_bestand is not None:
-            # dtype=str voorkomt dat Excel/pandas voorloopnullen (zoals 05677484) verwijdert
+            # dtype=str voorkomt dat Excel/pandas voorloopnullen verwijdert
             df = pd.read_excel(excel_bestand, dtype=str)
             df.columns = df.columns.str.strip().str.upper()
             
@@ -541,9 +545,14 @@ with tab2:
                 resultaten = []
                 zip_buffer = io.BytesIO()
                 heeft_mpn = 'MPN' in df.columns
+                heeft_sleutel = 'ERP_SLEUTEL' in df.columns
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
+                        # ERP_SLEUTEL behoudt exacte opmaak (geen .upper())
+                        sleutel_raw = str(row['ERP_SLEUTEL']).strip() if (heeft_sleutel and pd.notna(row['ERP_SLEUTEL'])) else ""
+                        sleutel_clean = "" if sleutel_raw.upper() in ("NAN", "NONE") else sleutel_raw
+
                         ncage_raw = str(row['NCAGE']).strip().upper() if pd.notna(row['NCAGE']) else ""
                         oem_raw = str(row['OEM']).strip().upper() if pd.notna(row['OEM']) else ""
                         mpn_raw = str(row['MPN']).strip().upper() if (heeft_mpn and pd.notna(row['MPN'])) else ""
@@ -581,7 +590,11 @@ with tab2:
                             except Exception:
                                 status = "FOUT (Barcode)"
 
-                        resultaten.append({
+                        rij_resultaat = {}
+                        if heeft_sleutel:
+                            rij_resultaat["ERP_SLEUTEL"] = sleutel_clean
+
+                        rij_resultaat.update({
                             "NCAGE": ncage_clean,
                             "MPN": mpn_clean,
                             "OEM": oem_clean,
@@ -591,6 +604,7 @@ with tab2:
                             "Status": status,
                             "ISO 15434 Syntax": syntax_string
                         })
+                        resultaten.append(rij_resultaat)
                 
                 df_resultaten = pd.DataFrame(resultaten)
                 
@@ -634,7 +648,6 @@ with tab2:
                         )
             else:
                 st.error("❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal **NCAGE** en **OEM**). Gebruik het sjabloon rechtsboven.")
-
 # 5. Footer (Eigenaarschap & Disclaimer)
 st.markdown("---")
 st.markdown(
