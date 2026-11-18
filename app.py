@@ -4,6 +4,7 @@ import io
 import json
 import re
 import zipfile
+from datetime import datetime
 from pylibdmtx.pylibdmtx import encode, decode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -30,6 +31,10 @@ if not st.session_state["ingelogd"]:
             st.error("❌ Onjuist wachtwoord. Toegang geweigerd.")
         st.stop()
 # --- EINDE BEVEILIGING ---
+
+# Initialiseer sessie-historie
+if "historie" not in st.session_state:
+    st.session_state["historie"] = []
 
 # 2. Defensie UX Styling (CSS Injectie)
 st.markdown("""
@@ -140,6 +145,30 @@ st.markdown("""
         color: #B25E00;
         border: 1px solid #FFD8A8;
     }
+    /* Kleurgecodeerde Syntax / DI weergave */
+    .syntax-box {
+        background-color: #F4F6F8;
+        border: 1px solid #D3D8DF;
+        border-radius: 2px;
+        padding: 10px 12px;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.8;
+        word-break: break-all;
+        margin-bottom: 8px;
+    }
+    .tok-hdr { background-color: #E2E8F0; color: #1E293B; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
+    .tok-ctrl { background-color: #FEE2E2; color: #991B1B; padding: 2px 4px; border-radius: 2px; font-size: 11px; font-weight: 700; }
+    .tok-17v { background-color: #DBEAFE; color: #1E40AF; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
+    .tok-1p { background-color: #F3E8FF; color: #6B21A8; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
+    .tok-s { background-color: #DCFCE7; color: #166534; padding: 2px 5px; border-radius: 2px; font-weight: 700; }
+    .di-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
     hr {
         margin-top: 0.6rem !important;
         margin-bottom: 0.6rem !important;
@@ -155,6 +184,47 @@ def wis_velden():
 
 def bevat_ongeldige_tekens(tekst):
     return bool(re.search(r'[^A-Za-z0-9\-/]', tekst))
+
+def bouw_kleur_syntax_html(ncage_clean, mpn_clean, oem_clean, construct="Construct 2"):
+    """Bouwt een kleurgecodeerde ASCII en HEX weergave van de ISO 15434 Format 06 syntax."""
+    if construct == "Construct 2":
+        ascii_html = (
+            '<span class="tok-hdr">[)&gt;</span>'
+            '<span class="tok-ctrl">RS</span>'
+            '<span class="tok-hdr">06</span>'
+            '<span class="tok-ctrl">GS</span>'
+            f'<span class="tok-17v">17V{ncage_clean}</span>'
+            '<span class="tok-ctrl">GS</span>'
+            f'<span class="tok-1p">1P{mpn_clean}</span>'
+            '<span class="tok-ctrl">GS</span>'
+            f'<span class="tok-s">S{oem_clean}</span>'
+            '<span class="tok-ctrl">RS</span>'
+            '<span class="tok-ctrl">EOT</span>'
+        )
+        hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;1P{mpn_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
+        di_html = (
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>NCAGE:</strong> {ncage_clean}</div>'
+            f'<div class="di-row"><span class="tok-1p">1P</span> <strong>MPN:</strong> {mpn_clean}</div>'
+            f'<div class="di-row"><span class="tok-s">S</span> <strong>Serienummer:</strong> {oem_clean}</div>'
+        )
+    else:
+        ascii_html = (
+            '<span class="tok-hdr">[)&gt;</span>'
+            '<span class="tok-ctrl">RS</span>'
+            '<span class="tok-hdr">06</span>'
+            '<span class="tok-ctrl">GS</span>'
+            f'<span class="tok-17v">17V{ncage_clean}</span>'
+            '<span class="tok-ctrl">GS</span>'
+            f'<span class="tok-s">S{oem_clean}</span>'
+            '<span class="tok-ctrl">RS</span>'
+            '<span class="tok-ctrl">EOT</span>'
+        )
+        hex_str = f"[)>&lt;0x1E&gt;06&lt;0x1D&gt;17V{ncage_clean}&lt;0x1D&gt;S{oem_clean}&lt;0x1E&gt;&lt;0x04&gt;"
+        di_html = (
+            f'<div class="di-row"><span class="tok-17v">17V</span> <strong>NCAGE:</strong> {ncage_clean}</div>'
+            f'<div class="di-row"><span class="tok-s">S</span> <strong>Serienummer:</strong> {oem_clean}</div>'
+        )
+    return ascii_html, hex_str, di_html
 
 def genereer_label_afbeelding(ncage_clean, mpn_clean, oem_clean, syntax_string, stijl="Laser (Wit op Zwart)", construct="Construct 2"):
     """Genereert het label (PNG Image) én voert direct een decode self-check uit."""
@@ -224,7 +294,7 @@ with st.sidebar:
     st.info("📌 **Defensie-richtlijn:** Voor regulier Defensie-materieel is **Construct 2** (`NCAGE + MPN + SN`) verplicht.")
     st.markdown("---")
     st.caption("**Ministerie van Defensie**")
-    st.caption("Versie: v2.2 (MIL-STD-130N)")
+    st.caption("Versie: v2.3 (MIL-STD-130N)")
     st.caption("Beheer: DM&D / CLAS")
 
 # 4. Strakke donkere Header Banner
@@ -331,6 +401,20 @@ with tab1:
                                 stijl=label_stijl, construct=construct_keuze
                             )
 
+                            virtueel_bestand = io.BytesIO()
+                            label_img.save(virtueel_bestand, format="PNG")
+                            bytes_data = virtueel_bestand.getvalue()
+
+                            # Sla op in sessie-historie (max. 5 meest recente)
+                            st.session_state["historie"].insert(0, {
+                                "tijd": datetime.now().strftime("%H:%M:%S"),
+                                "uii": uii,
+                                "construct": construct_keuze,
+                                "stijl": label_stijl,
+                                "png_bytes": bytes_data
+                            })
+                            st.session_state["historie"] = st.session_state["historie"][:5]
+
                             decode_badge = (
                                 '<span class="badge badge-ok">✓ DECODE GEVALIDEERD</span>'
                                 if decode_ok else
@@ -344,32 +428,14 @@ with tab1:
                             st.markdown(f"""
                                 <div class="badge-row">
                                     <span class="badge">MIL-STD-130N</span>
+                                    <span class="badge">FORMAT 06</span>
                                     {construct_badge}
-                                    <span class="badge">ECC 200</span>
                                     {decode_badge}
                                 </div>
                             """, unsafe_allow_html=True)
 
                             st.success(f"**Berekende UII:** `{uii}`")
-                            
-                            output_data = {
-                                "uii": uii,
-                                "construct": construct_keuze,
-                                "ncage": ncage_clean,
-                                "mpn": mpn_clean if construct_keuze == "Construct 2" else None,
-                                "oem_serial": oem_clean,
-                                "iso_15434_syntax": syntax_string,
-                                "decode_verified": decode_ok
-                            }
-                            
-                            with st.expander("Toon Machine-Readable JSON (Optioneel)"):
-                                st.json(output_data)
-                            
                             st.image(label_img, caption=f"Gegenereerd Label ({label_stijl})", width=460)
-                            
-                            virtueel_bestand = io.BytesIO()
-                            label_img.save(virtueel_bestand, format="PNG")
-                            bytes_data = virtueel_bestand.getvalue()
                             
                             st.download_button(
                                 label="🖨️ Download & Print Label (.png)",
@@ -379,6 +445,31 @@ with tab1:
                                 type="primary",
                                 use_container_width=True
                             )
+
+                            # Uitklapbare Technische Syntax (ASCII, HEX & Data Identifiers)
+                            ascii_html, hex_str, di_html = bouw_kleur_syntax_html(
+                                ncage_clean, mpn_clean, oem_clean, construct=construct_keuze
+                            )
+                            with st.expander("🔍 Toon Technische Syntax (ASCII / HEX & DI's)"):
+                                st.markdown("**Data Identifiers (Format 06):**")
+                                st.markdown(di_html, unsafe_allow_html=True)
+                                st.markdown("**ASCII Structuur:**")
+                                st.markdown(f'<div class="syntax-box">{ascii_html}</div>', unsafe_allow_html=True)
+                                st.markdown("**Raw Data (HEX stuurtekens):**")
+                                st.markdown(f'<div class="syntax-box">{hex_str}</div>', unsafe_allow_html=True)
+
+                            output_data = {
+                                "uii": uii,
+                                "construct": construct_keuze,
+                                "ncage": ncage_clean,
+                                "mpn": mpn_clean if construct_keuze == "Construct 2" else None,
+                                "oem_serial": oem_clean,
+                                "iso_15434_syntax": syntax_string,
+                                "decode_verified": decode_ok
+                            }
+                            with st.expander("Toon Machine-Readable JSON (Optioneel)"):
+                                st.json(output_data)
+
                         except Exception as e:
                             st.error(f"❌ Fout bij genereren barcode: {e}")
                 else:
@@ -387,8 +478,8 @@ with tab1:
                 st.markdown("""
                     <div class="badge-row">
                         <span class="badge">MIL-STD-130N</span>
+                        <span class="badge">FORMAT 06</span>
                         <span class="badge">CONSTRUCT 2 VERPLICHT</span>
-                        <span class="badge">ECC 200</span>
                     </div>
                 """, unsafe_allow_html=True)
                 st.info(
@@ -397,13 +488,33 @@ with tab1:
                     "De tool berekent de UII, voert automatisch een **decode self-check** uit en levert direct een printklaar label."
                 )
 
+    # Sessie-historie onderaan Tab 1
+    if st.session_state["historie"]:
+        with st.container(border=True):
+            st.subheader("🕒 Recente Labels (Deze Sessie)")
+            for idx, item in enumerate(st.session_state["historie"]):
+                h_col1, h_col2, h_col3 = st.columns([3, 2, 1.5])
+                with h_col1:
+                    st.markdown(f"**`{item['uii']}`**")
+                with h_col2:
+                    st.caption(f"{item['tijd']} · {item['construct']} · {item['stijl']}")
+                with h_col3:
+                    st.download_button(
+                        label="⬇️ Opnieuw (.png)",
+                        data=item["png_bytes"],
+                        file_name=f"Label_{item['uii']}.png",
+                        mime="image/png",
+                        key=f"hist_dl_{idx}",
+                        use_container_width=True
+                    )
+
 # ==========================================
 # TAB 2: BATCH INVOER (EXCEL - VAST CONSTRUCT 2)
 # ==========================================
 with tab2:
     with st.container(border=True):
         st.subheader("Batch Verwerking via Excel (Vast: Construct 2)")
-        st.info("ℹ️ Conform Defensie-beleid verwerkt de batch-module uitsluitend **Construct 2** (`NCAGE + MPN + OEM`). Alle drie de kolommen zijn daarom verplicht.")
+        st.info("ℹ️ Conform Defensie-beleid verwerkt de batch-module uitsluitend **Construct 2** (`NCAGE + MPN + OEM`). Voorloopnullen in serienummers blijven automatisch behouden.")
         
         sjabloon_df = pd.DataFrame({
             "NCAGE": ["A213N"],
@@ -431,7 +542,8 @@ with tab2:
         excel_bestand = st.file_uploader("Sleep je Excel-bestand hierheen of klik op bladeren", type=["xlsx"])
 
         if excel_bestand is not None:
-            df = pd.read_excel(excel_bestand)
+            # dtype=str voorkomt dat Excel/pandas voorloopnullen (zoals 05677484) verwijdert
+            df = pd.read_excel(excel_bestand, dtype=str)
             df.columns = df.columns.str.strip().str.upper()
             
             if set(['NCAGE', 'MPN', 'OEM']).issubset(df.columns):
@@ -440,9 +552,9 @@ with tab2:
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                     for index, row in df.iterrows():
-                        ncage_raw = str(row['NCAGE']).strip().upper()
-                        mpn_raw = str(row['MPN']).strip().upper()
-                        oem_raw = str(row['OEM']).strip().upper()
+                        ncage_raw = str(row['NCAGE']).strip().upper() if pd.notna(row['NCAGE']) else ""
+                        mpn_raw = str(row['MPN']).strip().upper() if pd.notna(row['MPN']) else ""
+                        oem_raw = str(row['OEM']).strip().upper() if pd.notna(row['OEM']) else ""
 
                         ncage_clean = "" if ncage_raw in ("NAN", "NONE") else ncage_raw
                         mpn_clean = "" if mpn_raw in ("NAN", "NONE") else mpn_raw
