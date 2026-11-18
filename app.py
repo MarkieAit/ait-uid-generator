@@ -470,4 +470,73 @@ with tab2:
                                     img.save(img_bytes, format="PNG")
                                     zf.writestr(f"Label_{index+1}_{uii}.png", img_bytes.getvalue())
                                     if not decode_ok:
-                                        status = "WAARSCHUW
+                                        status = "WAARSCHUWING (Decode check)"
+                                except Exception:
+                                    status = "FOUT (Barcode)"
+
+                            resultaten.append({
+                                "NCAGE": ncage_clean,
+                                "MPN": mpn_clean,
+                                "OEM": oem_clean,
+                                "NSN": nsn_clean,
+                                "Construct": construct_type,
+                                "UII": uii,
+                                "Lengte": len(uii),
+                                "Status": status,
+                                "ISO 15434 Syntax": syntax_string
+                            })
+                
+                df_resultaten = pd.DataFrame(resultaten)
+                
+                if not df_resultaten.empty:
+                    # Duplicaat-detectie op UII
+                    duplicaten = df_resultaten[df_resultaten['UII'].duplicated(keep=False)]
+                    if not duplicaten.empty:
+                        unieke_dups = ", ".join(duplicaten['UII'].unique())
+                        st.warning(f"⚠️ **Duplicaat-detectie:** De volgende UII('s) komen vaker voor in dit bestand: `{unieke_dups}`")
+
+                    st.markdown(f"""
+                        <div class="badge-row">
+                            <span class="badge">BATCH VERWERKING</span>
+                            <span class="badge badge-ok">✓ {len(df_resultaten)} REGELS VERWERKT</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    st.dataframe(df_resultaten, use_container_width=True)
+
+                    excel_output = io.BytesIO()
+                    with pd.ExcelWriter(excel_output, engine='openpyxl') as writer:
+                        df_resultaten.to_excel(writer, index=False)
+                    
+                    dl_col1, dl_col2 = st.columns(2)
+                    with dl_col1:
+                        st.download_button(
+                            label="📥 Download Verwerkte Lijst (.xlsx)",
+                            data=excel_output.getvalue(),
+                            file_name="DM&D_UID_Batch_Resultaten.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    with dl_col2:
+                        st.download_button(
+                            label="📦 Download Alle Labels (.zip)",
+                            data=zip_buffer.getvalue(),
+                            file_name="DM&D_UID_Batch_Labels.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+            else:
+                st.error("❌ Fout: De geüploade Excel mist de verplichte kolommen (minimaal NCAGE en OEM). Gebruik het sjabloon rechtsboven.")
+
+# 5. Footer (Naam / Eigenaarschap onderaan de pagina)
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #555; font-size: 13px;'>
+        <strong>Ontwikkeld door: Marco van Dijk</strong><br>
+        Projectleider AIT / UID | Directie Materieel &amp; Diensten (DM&amp;D) / CLAS
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
