@@ -197,3 +197,14 @@ if excel_bestand is not None:
                 syntax_string = f"[)>[RS]06[GS]17V{ncage_clean}[GS]1P{mpn_clean}[GS]S{oem_clean}[RS][EOT]"
                 
                 # Voeg toe aan de resultatenlij
+# 5. Footer (Naam / Eigenaarschap onderaan de pagina)
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #555; font-size: 14px;'>
+        <strong>Ontwikkeld door: Marco van Dijk</strong><br>
+        Projectleider AIT / UID | Directie Materieel & Diensten (DM&D) / CLAS
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
