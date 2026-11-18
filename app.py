@@ -1,19 +1,3 @@
-# Initialiseer sessie-status
-if "taal" not in st.session_state:
-    st.session_state["taal"] = "NL"
-if "ingelogd" not in st.session_state:
-    st.session_state["ingelogd"] = False
-if "historie" not in st.session_state:
-    st.session_state["historie"] = []
-
-# Vooraf ingevulde proefdata bij opstarten
-if "ncage_input" not in st.session_state:
-    st.session_state["ncage_input"] = "A213N"
-if "mpn_input" not in st.session_state:
-    st.session_state["mpn_input"] = "YS2R8X800"
-if "oem_input" not in st.session_state:
-    st.session_state["oem_input"] = "05677484"
-
 """
 UID Studio™ — MIL-STD-130N & STANAG 2290 Generator & Validator
 Copyright (c) 2026 Marco van Dijk. All rights reserved.
@@ -54,6 +38,23 @@ if "ingelogd" not in st.session_state:
     st.session_state["ingelogd"] = False
 if "historie" not in st.session_state:
     st.session_state["historie"] = []
+    # Initialiseer sessie-status
+if "taal" not in st.session_state:
+    st.session_state["taal"] = "NL"
+if "ingelogd" not in st.session_state:
+    st.session_state["ingelogd"] = False
+if "historie" not in st.session_state:
+    st.session_state["historie"] = []
+
+# Vooraf ingevulde proefdata bij opstarten
+if "ncage_input" not in st.session_state:
+    st.session_state["ncage_input"] = "A213N"
+if "mpn_input" not in st.session_state:
+    st.session_state["mpn_input"] = "YS2R8X800"
+if "oem_input" not in st.session_state:
+    st.session_state["oem_input"] = "05677484"
+
+
 
 # ==========================================
 # VERTALINGEN (NL / EN)
